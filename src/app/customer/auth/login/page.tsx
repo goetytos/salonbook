@@ -3,13 +3,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useAuth } from "@/lib/auth-context";
+import { useCustomerAuth } from "@/lib/customer-auth-context";
 import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 
-export default function LoginPage() {
+export default function CustomerLoginPage() {
   const router = useRouter();
-  const { login } = useAuth();
+  const { login } = useCustomerAuth();
   const [form, setForm] = useState({ email: "", password: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -21,7 +21,7 @@ export default function LoginPage() {
 
     try {
       await login(form.email, form.password);
-      router.push("/dashboard");
+      router.push("/customer");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
     } finally {
@@ -39,8 +39,8 @@ export default function LoginPage() {
             </div>
             <span className="text-xl font-bold text-dark-900">SalonBook</span>
           </Link>
-          <h1 className="text-2xl font-bold text-dark-900">Owner Login</h1>
-          <p className="text-dark-500 mt-1">Sign in to your business dashboard</p>
+          <h1 className="text-2xl font-bold text-dark-900">Customer Login</h1>
+          <p className="text-dark-500 mt-1">Sign in to view your bookings</p>
         </div>
 
         <div className="bg-white rounded-xl border border-dark-200 shadow-sm p-6">
@@ -75,14 +75,14 @@ export default function LoginPage() {
 
         <p className="text-center text-sm text-dark-500 mt-4">
           Don&apos;t have an account?{" "}
-          <Link href="/auth/signup" className="text-primary-600 font-medium hover:text-primary-700">
+          <Link href="/customer/auth/signup" className="text-primary-600 font-medium hover:text-primary-700">
             Sign up
           </Link>
         </p>
         <p className="text-center text-sm text-dark-400 mt-2">
-          Looking to book an appointment?{" "}
-          <Link href="/customer/auth/login" className="text-primary-600 font-medium hover:text-primary-700">
-            Customer login
+          Are you a salon owner?{" "}
+          <Link href="/auth/login" className="text-primary-600 font-medium hover:text-primary-700">
+            Owner login
           </Link>
         </p>
       </div>

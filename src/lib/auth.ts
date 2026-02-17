@@ -5,9 +5,14 @@ import { NextRequest } from "next/server";
 const JWT_SECRET: Secret = process.env.JWT_SECRET || "dev-secret-change-in-production";
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "7d";
 
+export type UserRole = "business" | "customer";
+
 export interface JWTPayload {
-  businessId: string;
+  id: string;
   email: string;
+  role: UserRole;
+  // Legacy alias — business routes read this
+  businessId?: string;
 }
 
 /** Hash a plaintext password */
@@ -23,7 +28,7 @@ export async function verifyPassword(
   return bcrypt.compare(password, hash);
 }
 
-/** Sign a JWT for a business owner */
+/** Sign a JWT */
 export function signToken(payload: JWTPayload): string {
   const options: SignOptions = { expiresIn: JWT_EXPIRES_IN as string & SignOptions["expiresIn"] };
   return jwt.sign(payload as object, JWT_SECRET, options);
@@ -34,21 +39,27 @@ export function verifyToken(token: string): JWTPayload {
   return jwt.verify(token, JWT_SECRET) as JWTPayload;
 }
 
-/** Extract the business ID from an authenticated request. Returns null if unauthenticated. */
-export function getAuthBusinessId(request: NextRequest): string | null {
+/** Parse the JWT from an Authorization header. Returns null if missing/invalid. */
+export function getAuthPayload(request: NextRequest): JWTPayload | null {
   const authHeader = request.headers.get("authorization");
   if (!authHeader?.startsWith("Bearer ")) return null;
 
   try {
     const token = authHeader.slice(7);
-    const payload = verifyToken(token);
-    return payload.businessId;
+    return verifyToken(token);
   } catch {
     return null;
   }
 }
 
-/** Require authentication — throws a Response if unauthorized */
+/** Extract business ID from request (backward-compatible helper) */
+export function getAuthBusinessId(request: NextRequest): string | null {
+  const payload = getAuthPayload(request);
+  if (!payload || payload.role !== "business") return null;
+  return payload.businessId || payload.id;
+}
+
+/** Require business-owner authentication — throws Response if unauthorized */
 export function requireAuth(request: NextRequest): string {
   const businessId = getAuthBusinessId(request);
   if (!businessId) {
@@ -58,4 +69,16 @@ export function requireAuth(request: NextRequest): string {
     });
   }
   return businessId;
+}
+
+/** Require customer authentication — throws Response if unauthorized */
+export function requireCustomerAuth(request: NextRequest): string {
+  const payload = getAuthPayload(request);
+  if (!payload || payload.role !== "customer") {
+    throw new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+  return payload.id;
 }

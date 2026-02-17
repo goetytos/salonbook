@@ -27,8 +27,8 @@ CREATE TABLE IF NOT EXISTS businesses (
   created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_businesses_slug ON businesses(slug);
-CREATE INDEX idx_businesses_email ON businesses(email);
+CREATE INDEX IF NOT EXISTS idx_businesses_slug ON businesses(slug);
+CREATE INDEX IF NOT EXISTS idx_businesses_email ON businesses(email);
 
 -- ─── Services ─────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS services (
@@ -40,18 +40,21 @@ CREATE TABLE IF NOT EXISTS services (
   created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_services_business ON services(business_id);
+CREATE INDEX IF NOT EXISTS idx_services_business ON services(business_id);
 
--- ─── Customers ────────────────────────────────────────
+-- ─── Customers (supports optional account login) ─────
 CREATE TABLE IF NOT EXISTS customers (
-  id         UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  name       VARCHAR(255) NOT NULL,
-  phone      VARCHAR(20) NOT NULL,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name          VARCHAR(255) NOT NULL,
+  phone         VARCHAR(20) NOT NULL,
+  email         VARCHAR(255) UNIQUE,
+  password_hash VARCHAR(255),
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE(name, phone)
 );
 
-CREATE INDEX idx_customers_phone ON customers(phone);
+CREATE INDEX IF NOT EXISTS idx_customers_phone ON customers(phone);
+CREATE INDEX IF NOT EXISTS idx_customers_email ON customers(email);
 
 -- ─── Bookings ─────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS bookings (
@@ -66,19 +69,14 @@ CREATE TABLE IF NOT EXISTS bookings (
   created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_bookings_business ON bookings(business_id);
-CREATE INDEX idx_bookings_date ON bookings(business_id, date);
-CREATE INDEX idx_bookings_customer ON bookings(customer_id);
-CREATE INDEX idx_bookings_status ON bookings(status);
+CREATE INDEX IF NOT EXISTS idx_bookings_business ON bookings(business_id);
+CREATE INDEX IF NOT EXISTS idx_bookings_date ON bookings(business_id, date);
+CREATE INDEX IF NOT EXISTS idx_bookings_customer ON bookings(customer_id);
+CREATE INDEX IF NOT EXISTS idx_bookings_status ON bookings(status);
 
 -- Prevent overlapping bookings for the same business on the same date.
--- Uses an exclusion constraint with time ranges: a new booking's [time, end_time)
--- must not overlap with any existing non-cancelled booking.
--- Note: requires btree_gist extension for combining equality and range exclusion.
 CREATE EXTENSION IF NOT EXISTS btree_gist;
 
--- Function-based approach for overlap prevention (works without exclusion constraint)
--- The application layer also enforces this via SELECT FOR UPDATE.
 CREATE OR REPLACE FUNCTION check_booking_overlap()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -96,6 +94,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS trg_check_booking_overlap ON bookings;
 CREATE TRIGGER trg_check_booking_overlap
   BEFORE INSERT OR UPDATE ON bookings
   FOR EACH ROW

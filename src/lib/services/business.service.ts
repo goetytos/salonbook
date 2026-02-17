@@ -39,10 +39,10 @@ export async function registerBusiness(
 
   if (!business) throw new Error("Failed to create business");
 
-  const token = signToken({ businessId: business.id, email: business.email });
+  const token = signToken({ id: business.id, email: business.email, role: "business", businessId: business.id });
 
   const { password_hash: _, ...safe } = business;
-  return { token, business: safe };
+  return { token, role: "business", business: safe };
 }
 
 /** Authenticate a business owner */
@@ -59,10 +59,10 @@ export async function loginBusiness(
   const valid = await verifyPassword(password, business.password_hash);
   if (!valid) throw new Error("Invalid email or password");
 
-  const token = signToken({ businessId: business.id, email: business.email });
+  const token = signToken({ id: business.id, email: business.email, role: "business", businessId: business.id });
 
   const { password_hash: _, ...safe } = business;
-  return { token, business: safe };
+  return { token, role: "business", business: safe };
 }
 
 /** Get business by ID (safe — no password) */

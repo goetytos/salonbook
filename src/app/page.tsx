@@ -13,12 +13,18 @@ export default function LandingPage() {
               </div>
               <span className="text-xl font-bold text-dark-900">SalonBook</span>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
+              <Link
+                href="/customer/auth/login"
+                className="text-sm font-medium text-dark-600 hover:text-dark-900 transition"
+              >
+                Customer Login
+              </Link>
               <Link
                 href="/auth/login"
                 className="text-sm font-medium text-dark-600 hover:text-dark-900 transition"
               >
-                Log in
+                Owner Login
               </Link>
               <Link
                 href="/auth/signup"

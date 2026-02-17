@@ -25,6 +25,8 @@ export interface Customer {
   id: string;
   name: string;
   phone: string;
+  email?: string;
+  password_hash?: string;
   created_at: string;
 }
 
@@ -44,6 +46,8 @@ export interface Booking {
   service_duration?: number;
   customer_name?: string;
   customer_phone?: string;
+  business_name?: string;
+  business_location?: string;
 }
 
 // ─── Enums & Value Types ──────────────────────────────
@@ -83,7 +87,9 @@ export interface LoginRequest {
 
 export interface AuthResponse {
   token: string;
-  business: Omit<Business, "password_hash">;
+  role: "business" | "customer";
+  business?: Omit<Business, "password_hash">;
+  customer?: Omit<Customer, "password_hash">;
 }
 
 export interface CreateServiceRequest {

@@ -3,14 +3,14 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useAuth } from "@/lib/auth-context";
+import { useCustomerAuth } from "@/lib/customer-auth-context";
 import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 
-export default function LoginPage() {
+export default function CustomerSignupPage() {
   const router = useRouter();
-  const { login } = useAuth();
-  const [form, setForm] = useState({ email: "", password: "" });
+  const { signup } = useCustomerAuth();
+  const [form, setForm] = useState({ name: "", email: "", password: "", phone: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -20,17 +20,17 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      await login(form.email, form.password);
-      router.push("/dashboard");
+      await signup(form);
+      router.push("/customer");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Login failed");
+      setError(err instanceof Error ? err.message : "Registration failed");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-dark-50 px-4">
+    <div className="min-h-screen flex items-center justify-center bg-dark-50 px-4 py-12">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center gap-2 mb-6">
@@ -39,8 +39,8 @@ export default function LoginPage() {
             </div>
             <span className="text-xl font-bold text-dark-900">SalonBook</span>
           </Link>
-          <h1 className="text-2xl font-bold text-dark-900">Owner Login</h1>
-          <p className="text-dark-500 mt-1">Sign in to your business dashboard</p>
+          <h1 className="text-2xl font-bold text-dark-900">Create Customer Account</h1>
+          <p className="text-dark-500 mt-1">Book and manage your appointments</p>
         </div>
 
         <div className="bg-white rounded-xl border border-dark-200 shadow-sm p-6">
@@ -52,6 +52,13 @@ export default function LoginPage() {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <Input
+              label="Full Name"
+              placeholder="e.g. Jane Wanjiku"
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              required
+            />
+            <Input
               label="Email"
               type="email"
               placeholder="you@example.com"
@@ -62,27 +69,35 @@ export default function LoginPage() {
             <Input
               label="Password"
               type="password"
-              placeholder="Enter your password"
+              placeholder="At least 8 characters"
               value={form.password}
               onChange={(e) => setForm({ ...form, password: e.target.value })}
               required
+              minLength={8}
+            />
+            <Input
+              label="Phone Number"
+              placeholder="07XXXXXXXX"
+              value={form.phone}
+              onChange={(e) => setForm({ ...form, phone: e.target.value })}
+              required
             />
             <Button type="submit" loading={loading} className="w-full">
-              Sign In
+              Create Account
             </Button>
           </form>
         </div>
 
         <p className="text-center text-sm text-dark-500 mt-4">
-          Don&apos;t have an account?{" "}
-          <Link href="/auth/signup" className="text-primary-600 font-medium hover:text-primary-700">
-            Sign up
+          Already have an account?{" "}
+          <Link href="/customer/auth/login" className="text-primary-600 font-medium hover:text-primary-700">
+            Sign in
           </Link>
         </p>
         <p className="text-center text-sm text-dark-400 mt-2">
-          Looking to book an appointment?{" "}
-          <Link href="/customer/auth/login" className="text-primary-600 font-medium hover:text-primary-700">
-            Customer login
+          Are you a salon owner?{" "}
+          <Link href="/auth/signup" className="text-primary-600 font-medium hover:text-primary-700">
+            Owner signup
           </Link>
         </p>
       </div>

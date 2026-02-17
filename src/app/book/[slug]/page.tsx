@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
+import Link from "next/link";
 import type { Service, TimeSlot } from "@/types";
 
 type Step = "service" | "datetime" | "details" | "confirmed";
@@ -456,6 +457,13 @@ export default function BookingPage() {
             >
               Book another appointment
             </button>
+
+            <p className="text-sm text-dark-400 mt-4">
+              <Link href="/customer/auth/signup" className="text-primary-600 hover:text-primary-700 font-medium">
+                Create an account
+              </Link>{" "}
+              to track all your bookings in one place.
+            </p>
           </div>
         )}
       </div>
