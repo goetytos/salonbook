@@ -7,6 +7,8 @@ import { useCustomerAuth, customerApi } from "@/lib/customer-auth-context";
 import Card, { CardContent } from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
+import Modal from "@/components/ui/Modal";
+import StarRating from "@/components/ui/StarRating";
 import type { Booking } from "@/types";
 
 export default function CustomerDashboard() {
@@ -14,6 +16,14 @@ export default function CustomerDashboard() {
   const router = useRouter();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [fetching, setFetching] = useState(true);
+
+  // Review state
+  const [reviewModal, setReviewModal] = useState(false);
+  const [reviewBookingId, setReviewBookingId] = useState("");
+  const [reviewRating, setReviewRating] = useState(0);
+  const [reviewComment, setReviewComment] = useState("");
+  const [submittingReview, setSubmittingReview] = useState(false);
+  const [reviewedBookings, setReviewedBookings] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!loading && !customer) {
@@ -42,6 +52,31 @@ export default function CustomerDashboard() {
     }
   };
 
+  const openReviewModal = (bookingId: string) => {
+    setReviewBookingId(bookingId);
+    setReviewRating(0);
+    setReviewComment("");
+    setReviewModal(true);
+  };
+
+  const handleSubmitReview = async () => {
+    if (!reviewRating || !reviewBookingId) return;
+    setSubmittingReview(true);
+    try {
+      await customerApi.post("/reviews", {
+        booking_id: reviewBookingId,
+        rating: reviewRating,
+        comment: reviewComment.trim() || undefined,
+      });
+      setReviewedBookings((prev) => new Set(prev).add(reviewBookingId));
+      setReviewModal(false);
+    } catch {
+      // silent
+    } finally {
+      setSubmittingReview(false);
+    }
+  };
+
   if (loading || !customer) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-dark-50">
@@ -55,7 +90,7 @@ export default function CustomerDashboard() {
 
   const badgeVariant = (status: string) => {
     if (status === "Booked") return "success" as const;
-    if (status === "Cancelled") return "danger" as const;
+    if (status === "Cancelled" || status === "No-Show") return "danger" as const;
     return "default" as const;
   };
 
@@ -151,6 +186,9 @@ export default function CustomerDashboard() {
                               })}{" "}
                               at {booking.time?.slice(0, 5)}
                             </p>
+                            {booking.staff_name && (
+                              <p className="text-xs text-dark-400 mt-0.5">with {booking.staff_name}</p>
+                            )}
                             {booking.service_price && (
                               <p className="text-sm font-medium text-primary-600 mt-1">
                                 KES {Number(booking.service_price).toLocaleString()}
@@ -200,6 +238,18 @@ export default function CustomerDashboard() {
                               at {booking.time?.slice(0, 5)}
                             </p>
                           </div>
+                          {booking.status === "Completed" && !reviewedBookings.has(booking.id) && (
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              onClick={() => openReviewModal(booking.id)}
+                            >
+                              Leave Review
+                            </Button>
+                          )}
+                          {reviewedBookings.has(booking.id) && (
+                            <span className="text-xs text-green-600 font-medium">Reviewed</span>
+                          )}
                         </div>
                       </CardContent>
                     </Card>
@@ -210,6 +260,44 @@ export default function CustomerDashboard() {
           </div>
         )}
       </div>
+
+      {/* Review Modal */}
+      <Modal
+        open={reviewModal}
+        onClose={() => setReviewModal(false)}
+        title="Leave a Review"
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-dark-700 mb-2">Rating</label>
+            <StarRating rating={reviewRating} onChange={setReviewRating} size="lg" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-dark-700 mb-1">
+              Comment (optional)
+            </label>
+            <textarea
+              value={reviewComment}
+              onChange={(e) => setReviewComment(e.target.value)}
+              placeholder="How was your experience?"
+              rows={3}
+              className="w-full px-3 py-2 border border-dark-200 rounded-lg text-dark-900 focus:outline-none focus:ring-2 focus:ring-primary-500"
+            />
+          </div>
+          <div className="flex gap-3 pt-2">
+            <Button
+              onClick={handleSubmitReview}
+              loading={submittingReview}
+              disabled={!reviewRating}
+            >
+              Submit Review
+            </Button>
+            <Button variant="secondary" onClick={() => setReviewModal(false)}>
+              Cancel
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

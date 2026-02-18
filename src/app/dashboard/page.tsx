@@ -3,23 +3,41 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api-client";
-import Card, { CardContent } from "@/components/ui/Card";
+import Card, { CardContent, CardHeader } from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
-import type { Booking } from "@/types";
+import BarChart from "@/components/ui/BarChart";
+import type { Booking, AnalyticsData } from "@/types";
 
 export default function DashboardOverview() {
   const { business, stats, refresh } = useAuth();
   const [upcomingBookings, setUpcomingBookings] = useState<Booking[]>([]);
+  const [weeklyData, setWeeklyData] = useState<{ label: string; value: number }[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!business) return;
     const today = new Date().toISOString().split("T")[0];
-    api
-      .get<Booking[]>(`/businesses/${business.id}/bookings?date=${today}`)
-      .then(setUpcomingBookings)
+
+    Promise.all([
+      api.get<Booking[]>(`/businesses/${business.id}/bookings?date=${today}`),
+      api.get<AnalyticsData>(`/businesses/${business.id}/analytics?period=7d`).catch(() => null),
+    ])
+      .then(([bookings, analytics]) => {
+        setUpcomingBookings(bookings);
+        if (analytics?.bookings) {
+          setWeeklyData(
+            analytics.bookings.map((b) => ({
+              label: new Date(b.date + "T00:00:00").toLocaleDateString("en-KE", {
+                weekday: "short",
+              }),
+              value: b.count,
+            }))
+          );
+        }
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
+
     refresh();
   }, [business, refresh]);
 
@@ -61,47 +79,64 @@ export default function DashboardOverview() {
         ))}
       </div>
 
-      {/* Today's Bookings */}
-      <Card>
-        <div className="px-6 py-4 border-b border-dark-100">
-          <h2 className="text-lg font-semibold text-dark-900">
-            Today&apos;s Bookings
-          </h2>
-        </div>
-        <CardContent>
-          {loading ? (
-            <p className="text-dark-400 text-sm py-4">Loading...</p>
-          ) : upcomingBookings.length === 0 ? (
-            <p className="text-dark-400 text-sm py-4">No bookings today.</p>
-          ) : (
-            <div className="divide-y divide-dark-100">
-              {upcomingBookings.map((booking) => (
-                <div key={booking.id} className="py-3 flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-dark-900">
-                      {booking.customer_name}
-                    </p>
-                    <p className="text-xs text-dark-500">
-                      {booking.service_name} &middot; {booking.time?.slice(0, 5)}
-                    </p>
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Today's Bookings */}
+        <Card>
+          <div className="px-6 py-4 border-b border-dark-100">
+            <h2 className="text-lg font-semibold text-dark-900">
+              Today&apos;s Bookings
+            </h2>
+          </div>
+          <CardContent>
+            {loading ? (
+              <p className="text-dark-400 text-sm py-4">Loading...</p>
+            ) : upcomingBookings.length === 0 ? (
+              <p className="text-dark-400 text-sm py-4">No bookings today.</p>
+            ) : (
+              <div className="divide-y divide-dark-100">
+                {upcomingBookings.map((booking) => (
+                  <div key={booking.id} className="py-3 flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-dark-900">
+                        {booking.customer_name}
+                      </p>
+                      <p className="text-xs text-dark-500">
+                        {booking.service_name} &middot; {booking.time?.slice(0, 5)}
+                        {booking.staff_name && ` · ${booking.staff_name}`}
+                      </p>
+                    </div>
+                    <Badge
+                      variant={
+                        booking.status === "Booked"
+                          ? "success"
+                          : booking.status === "Cancelled" || booking.status === "No-Show"
+                          ? "danger"
+                          : "default"
+                      }
+                    >
+                      {booking.status}
+                    </Badge>
                   </div>
-                  <Badge
-                    variant={
-                      booking.status === "Booked"
-                        ? "success"
-                        : booking.status === "Cancelled"
-                        ? "danger"
-                        : "default"
-                    }
-                  >
-                    {booking.status}
-                  </Badge>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Weekly Bookings Chart */}
+        <Card>
+          <CardHeader>
+            <h2 className="text-lg font-semibold text-dark-900">This Week</h2>
+          </CardHeader>
+          <CardContent>
+            {weeklyData.length > 0 ? (
+              <BarChart data={weeklyData} maxHeight={140} />
+            ) : (
+              <p className="text-dark-400 text-sm py-4">No booking data this week.</p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Booking Link */}
       {business && (

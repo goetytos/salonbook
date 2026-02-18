@@ -1,9 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api-client";
 import Card, { CardContent } from "@/components/ui/Card";
+import SearchBar from "@/components/ui/SearchBar";
+import EmptyState from "@/components/ui/EmptyState";
 
 interface CustomerRow {
   id: string;
@@ -18,6 +21,7 @@ export default function CustomersPage() {
   const { business } = useAuth();
   const [customers, setCustomers] = useState<CustomerRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
 
   useEffect(() => {
     if (!business) return;
@@ -28,23 +32,49 @@ export default function CustomersPage() {
       .finally(() => setLoading(false));
   }, [business]);
 
+  const filtered = customers.filter(
+    (c) =>
+      c.name.toLowerCase().includes(search.toLowerCase()) ||
+      c.phone.includes(search)
+  );
+
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-dark-900">Customers</h1>
-        <p className="text-dark-500 text-sm mt-1">
-          Your client list, built automatically from bookings
-        </p>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-dark-900">Customers</h1>
+          <p className="text-dark-500 text-sm mt-1">
+            Your client list, built automatically from bookings
+          </p>
+        </div>
       </div>
+
+      {customers.length > 0 && (
+        <div className="mb-4">
+          <SearchBar
+            value={search}
+            onChange={setSearch}
+            placeholder="Search by name or phone..."
+            className="max-w-sm"
+          />
+        </div>
+      )}
 
       {loading ? (
         <p className="text-dark-400">Loading...</p>
       ) : customers.length === 0 ? (
         <Card>
-          <CardContent className="py-12 text-center">
-            <p className="text-dark-500">
-              No customers yet. Customers are added when they book an appointment.
-            </p>
+          <CardContent>
+            <EmptyState
+              title="No customers yet"
+              description="Customers are added automatically when they book an appointment."
+            />
+          </CardContent>
+        </Card>
+      ) : filtered.length === 0 ? (
+        <Card>
+          <CardContent className="py-8 text-center">
+            <p className="text-dark-500">No customers matching &quot;{search}&quot;</p>
           </CardContent>
         </Card>
       ) : (
@@ -60,9 +90,16 @@ export default function CustomersPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-dark-100">
-                {customers.map((customer) => (
+                {filtered.map((customer) => (
                   <tr key={customer.id} className="hover:bg-dark-50 transition">
-                    <td className="px-6 py-3 font-medium text-dark-900">{customer.name}</td>
+                    <td className="px-6 py-3">
+                      <Link
+                        href={`/dashboard/customers/${customer.id}`}
+                        className="font-medium text-primary-600 hover:text-primary-700"
+                      >
+                        {customer.name}
+                      </Link>
+                    </td>
                     <td className="px-6 py-3 text-dark-700">{customer.phone}</td>
                     <td className="px-6 py-3 text-dark-700">{customer.booking_count}</td>
                     <td className="px-6 py-3 text-dark-700">

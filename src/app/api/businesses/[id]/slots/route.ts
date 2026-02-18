@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { getAvailableSlots } from "@/lib/services/booking.service";
 import { validateDateFormat, errorResponse } from "@/lib/validation";
 
-// GET /api/businesses/[id]/slots?date=YYYY-MM-DD&duration=30
+// GET /api/businesses/[id]/slots?date=YYYY-MM-DD&duration=30&staff_id=...
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -12,6 +12,7 @@ export async function GET(
     const url = new URL(request.url);
     const date = url.searchParams.get("date");
     const duration = url.searchParams.get("duration");
+    const staffId = url.searchParams.get("staff_id") || undefined;
 
     if (!date || !validateDateFormat(date)) {
       return errorResponse("Valid date parameter required (YYYY-MM-DD)");
@@ -28,7 +29,7 @@ export async function GET(
       return errorResponse("Cannot book in the past");
     }
 
-    const slots = await getAvailableSlots(id, date, durationMinutes);
+    const slots = await getAvailableSlots(id, date, durationMinutes, staffId);
     return Response.json(slots);
   } catch {
     return errorResponse("Failed to fetch available slots", 500);

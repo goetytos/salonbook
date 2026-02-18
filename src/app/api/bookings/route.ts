@@ -13,7 +13,17 @@ import {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { business_slug, service_id, date, time, customer_name, customer_phone } = body;
+    const {
+      business_slug,
+      service_id,
+      date,
+      time,
+      customer_name,
+      customer_phone,
+      staff_id,
+      notes,
+      promotion_code,
+    } = body;
 
     // Validate all required fields
     if (!business_slug || !service_id || !date || !time || !customer_name || !customer_phone) {
@@ -51,14 +61,46 @@ export async function POST(request: NextRequest) {
       return errorResponse("Business not found", 404);
     }
 
+    // Validate and apply promotion if provided
+    let promotionId: string | undefined;
+    if (promotion_code) {
+      const { validatePromotion, incrementUsage } = await import(
+        "@/lib/services/promotion.service"
+      );
+      const promo = await validatePromotion(business.id, promotion_code, service_id);
+      if (!promo) {
+        return errorResponse("Invalid or expired promotion code");
+      }
+      promotionId = promo.id;
+      await incrementUsage(promo.id);
+    }
+
     const booking = await createBooking(
       business.id,
       service_id,
       cleanName,
       cleanPhone,
       date,
-      time
+      time,
+      staff_id || undefined,
+      notes ? sanitize(notes) : undefined,
+      promotionId
     );
+
+    // Fire confirmation notification (non-blocking)
+    import("@/lib/services/notification.service")
+      .then(({ sendBookingConfirmation }) =>
+        sendBookingConfirmation(
+          booking.id,
+          business.id,
+          cleanPhone,
+          cleanName,
+          booking.service_name || "your service",
+          date,
+          time
+        )
+      )
+      .catch(() => {});
 
     return Response.json(booking, { status: 201 });
   } catch (error) {

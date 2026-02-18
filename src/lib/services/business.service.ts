@@ -127,6 +127,84 @@ export async function getDashboardStats(
   return totals;
 }
 
+/** Update business profile fields */
+export async function updateBusinessProfile(
+  businessId: string,
+  data: {
+    description?: string;
+    category?: string;
+    cover_image_url?: string;
+    avatar_url?: string;
+    buffer_minutes?: number;
+    cancellation_hours?: number;
+    social_links?: Record<string, string>;
+    deposit_required?: boolean;
+  }
+): Promise<Omit<Business, "password_hash"> | null> {
+  const business = await queryOne<Business>(
+    `UPDATE businesses SET
+      description = COALESCE($2, description),
+      category = COALESCE($3, category),
+      cover_image_url = COALESCE($4, cover_image_url),
+      avatar_url = COALESCE($5, avatar_url),
+      buffer_minutes = COALESCE($6, buffer_minutes),
+      cancellation_hours = COALESCE($7, cancellation_hours),
+      social_links = COALESCE($8, social_links),
+      deposit_required = COALESCE($9, deposit_required)
+     WHERE id = $1
+     RETURNING *`,
+    [
+      businessId,
+      data.description ?? null,
+      data.category ?? null,
+      data.cover_image_url ?? null,
+      data.avatar_url ?? null,
+      data.buffer_minutes ?? null,
+      data.cancellation_hours ?? null,
+      data.social_links ? JSON.stringify(data.social_links) : null,
+      data.deposit_required ?? null,
+    ]
+  );
+  if (!business) return null;
+  const { password_hash: _, ...safe } = business;
+  return safe;
+}
+
+/** Get public business profile with services, staff, and review summary */
+export async function getPublicBusinessProfile(slug: string) {
+  const business = await queryOne<Business>(
+    "SELECT * FROM businesses WHERE slug = $1",
+    [slug]
+  );
+  if (!business) return null;
+  const { password_hash: _, ...safe } = business;
+
+  const services = await query(
+    "SELECT * FROM services WHERE business_id = $1 AND (active IS NULL OR active = true) ORDER BY created_at DESC",
+    [business.id]
+  );
+
+  const staff = await query(
+    "SELECT * FROM staff WHERE business_id = $1 AND active = true ORDER BY name",
+    [business.id]
+  );
+
+  const ratingResult = await queryOne<{ avg_rating: number; review_count: number }>(
+    `SELECT COALESCE(AVG(rating), 0)::numeric as avg_rating,
+            COUNT(*)::int as review_count
+     FROM reviews WHERE business_id = $1`,
+    [business.id]
+  );
+
+  return {
+    ...safe,
+    services,
+    staff,
+    avg_rating: Number(ratingResult?.avg_rating || 0),
+    review_count: ratingResult?.review_count || 0,
+  };
+}
+
 /** Get customers for a business */
 export async function getBusinessCustomers(businessId: string) {
   return query(
