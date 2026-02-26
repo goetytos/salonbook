@@ -7,6 +7,7 @@ import type { Service, TimeSlot, Staff } from "@/types";
 import StaffPicker from "@/components/booking/StaffPicker";
 import TimeSlotGrid from "@/components/booking/TimeSlotGrid";
 import BookingSummaryCard from "@/components/booking/BookingSummaryCard";
+import { ScissorsIcon } from "@/components/icons/SalonIcons";
 
 type Step = "service" | "staff" | "datetime" | "details" | "confirmed";
 
@@ -18,6 +19,13 @@ interface BusinessPublic {
   location: string;
   avatar_url?: string;
 }
+
+const STEP_LABELS: Record<string, string> = {
+  service: "Service",
+  staff: "Stylist",
+  datetime: "Date & Time",
+  details: "Details",
+};
 
 export default function BookingPage() {
   const params = useParams();
@@ -230,45 +238,58 @@ export default function BookingPage() {
   const selectedStaffMember = staff.find((s) => s.id === selectedStaffId);
 
   return (
-    <div className="min-h-screen bg-dark-50">
-      {/* Header */}
-      <div className="bg-white border-b border-dark-100">
+    <div className="min-h-screen bg-dark-50 salon-pattern-bg">
+      {/* Gradient Header Band */}
+      <div className="bg-gradient-to-r from-primary-700 via-primary-600 to-primary-700">
         <div className="max-w-2xl mx-auto px-4 py-6">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-primary-600 rounded-lg flex items-center justify-center">
+            <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
               <span className="text-white font-bold">
                 {business?.name.charAt(0)}
               </span>
             </div>
             <div>
-              <h1 className="text-lg font-bold text-dark-900">{business?.name}</h1>
-              <p className="text-sm text-dark-500">{business?.location}</p>
+              <h1 className="text-lg font-bold text-white">{business?.name}</h1>
+              <p className="text-sm text-primary-200">{business?.location}</p>
             </div>
           </div>
         </div>
       </div>
 
       <div className="max-w-2xl mx-auto px-4 py-8">
-        {/* Progress Indicator */}
+        {/* Enhanced Progress Indicator */}
         {step !== "confirmed" && (
-          <div className="flex items-center gap-2 mb-8">
+          <div className="flex items-center gap-1 sm:gap-2 mb-8">
             {allSteps.map((s, i) => (
-              <div key={s} className="flex items-center gap-2">
-                <div
-                  className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                    step === s
-                      ? "bg-primary-600 text-white"
-                      : currentStepIdx > i
-                      ? "bg-primary-100 text-primary-700"
-                      : "bg-dark-100 text-dark-400"
-                  }`}
-                >
-                  {i + 1}
+              <div key={s} className="flex items-center gap-1 sm:gap-2">
+                <div className="flex flex-col items-center gap-1">
+                  <div
+                    className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold transition-all ${
+                      step === s
+                        ? "bg-primary-600 text-white shadow-lg ring-4 ring-primary-100"
+                        : currentStepIdx > i
+                        ? "bg-primary-500 text-white"
+                        : "bg-dark-100 text-dark-400"
+                    }`}
+                  >
+                    {currentStepIdx > i ? (
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                      </svg>
+                    ) : (
+                      i + 1
+                    )}
+                  </div>
+                  <span className={`text-xs font-medium hidden sm:block ${
+                    step === s ? "text-primary-700" : currentStepIdx > i ? "text-primary-500" : "text-dark-400"
+                  }`}>
+                    {STEP_LABELS[s]}
+                  </span>
                 </div>
                 {i < allSteps.length - 1 && (
                   <div
-                    className={`w-12 h-0.5 ${
-                      currentStepIdx > i ? "bg-primary-300" : "bg-dark-200"
+                    className={`w-8 sm:w-14 h-0.5 mb-4 sm:mb-5 ${
+                      currentStepIdx > i ? "bg-primary-400" : "bg-dark-200"
                     }`}
                   />
                 )}
@@ -294,19 +315,24 @@ export default function BookingPage() {
                 <button
                   key={service.id}
                   onClick={() => handleServiceSelect(service)}
-                  className="w-full text-left bg-white rounded-xl border border-dark-200 p-4 hover:border-primary-300 hover:shadow-sm transition group"
+                  className="w-full text-left bg-white rounded-xl border border-dark-200 border-l-4 border-l-transparent p-4 hover:border-l-primary-500 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 group"
                 >
                   <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="font-semibold text-dark-900 group-hover:text-primary-700 transition">
-                        {service.name}
-                      </h3>
-                      <p className="text-sm text-dark-500 mt-0.5">
-                        {service.duration_minutes} minutes
-                      </p>
-                      {service.description && (
-                        <p className="text-xs text-dark-400 mt-1">{service.description}</p>
-                      )}
+                    <div className="flex items-start gap-3">
+                      <div className="mt-0.5 text-dark-300 group-hover:text-primary-500 transition-colors">
+                        <ScissorsIcon className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-dark-900 group-hover:text-primary-700 transition">
+                          {service.name}
+                        </h3>
+                        <p className="text-sm text-dark-500 mt-0.5">
+                          {service.duration_minutes} minutes
+                        </p>
+                        {service.description && (
+                          <p className="text-xs text-dark-400 mt-1">{service.description}</p>
+                        )}
+                      </div>
                     </div>
                     <span className="text-lg font-bold text-primary-600">
                       KES {Number(service.price).toLocaleString()}
@@ -551,7 +577,7 @@ export default function BookingPage() {
               Your appointment has been booked successfully.
             </p>
 
-            <div className="bg-white border border-dark-200 rounded-xl p-6 text-left max-w-sm mx-auto mb-6">
+            <div className="bg-white border border-dark-200 rounded-xl p-6 text-left max-w-sm mx-auto mb-6 shadow-sm">
               <div className="space-y-3 text-sm">
                 <div className="flex justify-between">
                   <span className="text-dark-500">Service</span>

@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import SearchBar from "@/components/ui/SearchBar";
 import BusinessCard from "@/components/booking/BusinessCard";
+import SalonBackground from "@/components/ui/SalonBackground";
+import { ScissorsIcon, CombIcon } from "@/components/icons/SalonIcons";
 
 interface DiscoverBusiness {
   id: string;
@@ -18,14 +20,14 @@ interface DiscoverBusiness {
 }
 
 const CATEGORIES = [
-  { value: "", label: "All" },
-  { value: "hair-salon", label: "Hair Salon" },
-  { value: "barbershop", label: "Barbershop" },
-  { value: "nail-salon", label: "Nail Salon" },
-  { value: "spa", label: "Spa" },
-  { value: "beauty-salon", label: "Beauty" },
-  { value: "braids", label: "Braids" },
-  { value: "makeup", label: "Makeup" },
+  { value: "", label: "All", icon: null },
+  { value: "hair-salon", label: "Hair Salon", icon: <ScissorsIcon className="w-3.5 h-3.5" /> },
+  { value: "barbershop", label: "Barbershop", icon: <CombIcon className="w-3.5 h-3.5" /> },
+  { value: "nail-salon", label: "Nail Salon", icon: null },
+  { value: "spa", label: "Spa", icon: null },
+  { value: "beauty-salon", label: "Beauty", icon: null },
+  { value: "braids", label: "Braids", icon: null },
+  { value: "makeup", label: "Makeup", icon: null },
 ];
 
 export default function ExplorePage() {
@@ -84,37 +86,42 @@ export default function ExplorePage() {
         </div>
       </nav>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-dark-900">Find a Salon</h1>
-          <p className="text-dark-500 mt-2">
+      {/* Gradient hero header band */}
+      <div className="relative bg-gradient-to-r from-primary-700 via-primary-600 to-primary-700 overflow-hidden">
+        <SalonBackground variant="subtle" />
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+          <h1 className="text-3xl font-bold text-white">Find a Salon</h1>
+          <p className="text-primary-100 mt-2">
             Discover and book with the best salons and barber shops in Kenya
           </p>
-        </div>
-
-        {/* Search + Filters */}
-        <div className="flex flex-col sm:flex-row gap-4 mb-8">
-          <SearchBar
-            value={search}
-            onChange={setSearch}
-            placeholder="Search by name or location..."
-            className="flex-1"
-          />
-          <div className="flex gap-2 flex-wrap">
-            {CATEGORIES.map((cat) => (
-              <button
-                key={cat.value}
-                onClick={() => setCategory(cat.value)}
-                className={`px-3 py-1.5 rounded-full text-sm font-medium transition ${
-                  category === cat.value
-                    ? "bg-primary-600 text-white"
-                    : "bg-white border border-dark-200 text-dark-600 hover:border-primary-300"
-                }`}
-              >
-                {cat.label}
-              </button>
-            ))}
+          <div className="mt-6 max-w-xl">
+            <SearchBar
+              value={search}
+              onChange={setSearch}
+              placeholder="Search by name or location..."
+              className="shadow-lg"
+            />
           </div>
+        </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Category Filters */}
+        <div className="flex gap-2 flex-wrap mb-8">
+          {CATEGORIES.map((cat) => (
+            <button
+              key={cat.value}
+              onClick={() => setCategory(cat.value)}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition ${
+                category === cat.value
+                  ? "bg-primary-600 text-white shadow-md"
+                  : "bg-white border border-dark-200 text-dark-600 hover:border-primary-300 hover:shadow-sm"
+              }`}
+            >
+              {cat.icon}
+              {cat.label}
+            </button>
+          ))}
         </div>
 
         {/* Results */}

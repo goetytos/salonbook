@@ -6,6 +6,8 @@ import Link from "next/link";
 import Tabs from "@/components/ui/Tabs";
 import StarRating from "@/components/ui/StarRating";
 import Avatar from "@/components/ui/Avatar";
+import SalonBackground from "@/components/ui/SalonBackground";
+import { ScissorsIcon } from "@/components/icons/SalonIcons";
 import type { BusinessPublicProfile, Review } from "@/types";
 
 export default function PublicProfilePage() {
@@ -67,19 +69,22 @@ export default function PublicProfilePage() {
 
   return (
     <div className="min-h-screen bg-dark-50">
-      {/* Cover Image Area */}
-      <div
-        className="h-48 bg-gradient-to-r from-primary-600 to-primary-700"
-        style={
-          profile.cover_image_url
-            ? { backgroundImage: `url(${profile.cover_image_url})`, backgroundSize: "cover", backgroundPosition: "center" }
-            : undefined
-        }
-      />
+      {/* Cover Image Area — richer gradient with salon pattern */}
+      <div className="relative h-56 overflow-hidden">
+        {profile.cover_image_url ? (
+          <div
+            className="absolute inset-0"
+            style={{ backgroundImage: `url(${profile.cover_image_url})`, backgroundSize: "cover", backgroundPosition: "center" }}
+          />
+        ) : (
+          <div className="absolute inset-0 bg-gradient-to-r from-primary-800 via-primary-600 to-accent-500" />
+        )}
+        <SalonBackground variant="subtle" />
+      </div>
 
       {/* Profile Header */}
       <div className="max-w-3xl mx-auto px-4 -mt-12">
-        <div className="bg-white rounded-xl border border-dark-200 p-6 shadow-sm">
+        <div className="bg-white rounded-xl border border-dark-200 border-t-4 border-t-accent-400 p-6 shadow-lg">
           <div className="flex flex-col sm:flex-row sm:items-end gap-4">
             <div className="-mt-16 sm:-mt-14">
               <div className="w-20 h-20 rounded-xl border-4 border-white bg-white shadow-sm overflow-hidden">
@@ -103,7 +108,7 @@ export default function PublicProfilePage() {
             </div>
             <Link
               href={`/book/${slug}`}
-              className="inline-flex items-center justify-center px-6 py-2.5 bg-primary-600 text-white font-medium rounded-lg hover:bg-primary-700 transition"
+              className="inline-flex items-center justify-center px-6 py-2.5 bg-primary-600 text-white font-medium rounded-lg hover:bg-primary-700 transition shadow-md"
             >
               Book Now
             </Link>
@@ -136,12 +141,17 @@ export default function PublicProfilePage() {
                       key={service.id}
                       className="flex items-center justify-between py-3 border-b border-dark-100 last:border-b-0"
                     >
-                      <div>
-                        <h3 className="font-medium text-dark-900">{service.name}</h3>
-                        <p className="text-sm text-dark-500">{service.duration_minutes} min</p>
-                        {service.description && (
-                          <p className="text-xs text-dark-400 mt-0.5">{service.description}</p>
-                        )}
+                      <div className="flex items-start gap-3">
+                        <div className="mt-1 text-primary-400">
+                          <ScissorsIcon className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <h3 className="font-medium text-dark-900">{service.name}</h3>
+                          <p className="text-sm text-dark-500">{service.duration_minutes} min</p>
+                          {service.description && (
+                            <p className="text-xs text-dark-400 mt-0.5">{service.description}</p>
+                          )}
+                        </div>
                       </div>
                       <div className="flex items-center gap-3">
                         <span className="font-semibold text-primary-600">
@@ -168,6 +178,7 @@ export default function PublicProfilePage() {
                 ) : (
                   reviews.map((review) => (
                     <div key={review.id} className="flex items-start gap-3 pb-4 border-b border-dark-100 last:border-b-0">
+                      <div className="w-1 self-stretch bg-accent-300 rounded-full shrink-0" />
                       <Avatar name={review.customer_name || "Guest"} size="sm" />
                       <div>
                         <div className="flex items-center gap-2 mb-1">
