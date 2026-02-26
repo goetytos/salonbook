@@ -28,7 +28,19 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen bg-dark-50">
       <Sidebar />
-      <main className="flex-1 p-6 lg:p-8 overflow-auto">{children}</main>
+      <div className="flex-1 flex flex-col overflow-auto">
+        {business.status === "pending" && (
+          <div className="bg-amber-50 border-b border-amber-200 px-6 py-3 text-sm text-amber-800">
+            <strong>Pending Approval:</strong> Your business is awaiting admin approval. It won&apos;t appear in public listings until activated.
+          </div>
+        )}
+        {business.status === "suspended" && (
+          <div className="bg-red-50 border-b border-red-200 px-6 py-3 text-sm text-red-800">
+            <strong>Suspended:</strong> Your business has been suspended and is not visible to customers. Please contact support.
+          </div>
+        )}
+        <main className="flex-1 p-6 lg:p-8">{children}</main>
+      </div>
     </div>
   );
 }

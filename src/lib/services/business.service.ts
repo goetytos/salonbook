@@ -31,8 +31,8 @@ export async function registerBusiness(
   const passwordHash = await hashPassword(password);
 
   const business = await queryOne<Business>(
-    `INSERT INTO businesses (name, slug, email, password_hash, phone, location)
-     VALUES ($1, $2, $3, $4, $5, $6)
+    `INSERT INTO businesses (name, slug, email, password_hash, phone, location, status)
+     VALUES ($1, $2, $3, $4, $5, $6, 'pending')
      RETURNING *`,
     [name, slug, email, passwordHash, phone, location]
   );
@@ -78,12 +78,12 @@ export async function getBusinessById(
   return safe;
 }
 
-/** Get business by slug (public) */
+/** Get business by slug (public — only active businesses) */
 export async function getBusinessBySlug(
   slug: string
 ): Promise<Omit<Business, "password_hash"> | null> {
   const business = await queryOne<Business>(
-    "SELECT * FROM businesses WHERE slug = $1",
+    "SELECT * FROM businesses WHERE slug = $1 AND status = 'active'",
     [slug]
   );
   if (!business) return null;
@@ -173,7 +173,7 @@ export async function updateBusinessProfile(
 /** Get public business profile with services, staff, and review summary */
 export async function getPublicBusinessProfile(slug: string) {
   const business = await queryOne<Business>(
-    "SELECT * FROM businesses WHERE slug = $1",
+    "SELECT * FROM businesses WHERE slug = $1 AND status = 'active'",
     [slug]
   );
   if (!business) return null;

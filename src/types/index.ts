@@ -19,6 +19,7 @@ export interface Business {
   cancellation_hours?: number;
   deposit_required?: boolean;
   buffer_minutes?: number;
+  status?: string;
 }
 
 export interface Service {
@@ -174,6 +175,23 @@ export interface WorkingHours {
   friday: DaySchedule;
   saturday: DaySchedule;
   sunday: DaySchedule;
+}
+
+export interface Admin {
+  id: string;
+  email: string;
+  password_hash: string;
+  name: string;
+  created_at: string;
+}
+
+export interface PlatformStats {
+  total_businesses: number;
+  pending_businesses: number;
+  active_businesses: number;
+  suspended_businesses: number;
+  total_bookings: number;
+  total_revenue: number;
 }
 
 // ─── API Request/Response Types ───────────────────────

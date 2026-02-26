@@ -5,7 +5,7 @@ import { NextRequest } from "next/server";
 const JWT_SECRET: Secret = process.env.JWT_SECRET || "dev-secret-change-in-production";
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "7d";
 
-export type UserRole = "business" | "customer";
+export type UserRole = "business" | "customer" | "admin";
 
 export interface JWTPayload {
   id: string;
@@ -75,6 +75,18 @@ export function requireAuth(request: NextRequest): string {
 export function requireCustomerAuth(request: NextRequest): string {
   const payload = getAuthPayload(request);
   if (!payload || payload.role !== "customer") {
+    throw new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+  return payload.id;
+}
+
+/** Require admin authentication — throws Response if unauthorized */
+export function requireAdminAuth(request: NextRequest): string {
+  const payload = getAuthPayload(request);
+  if (!payload || payload.role !== "admin") {
     throw new Response(JSON.stringify({ error: "Unauthorized" }), {
       status: 401,
       headers: { "Content-Type": "application/json" },

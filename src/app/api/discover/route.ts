@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
              COUNT(r.id)::int as review_count
       FROM businesses b
       LEFT JOIN reviews r ON b.id = r.business_id
-      WHERE 1=1
+      WHERE b.status = 'active'
     `;
     const params: unknown[] = [];
 
