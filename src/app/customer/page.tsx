@@ -9,7 +9,19 @@ import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
 import StarRating from "@/components/ui/StarRating";
+import BusinessCard from "@/components/booking/BusinessCard";
 import type { Booking } from "@/types";
+
+interface DiscoverBusiness {
+  id: string;
+  name: string;
+  slug: string;
+  location: string;
+  category?: string;
+  avatar_url?: string;
+  avg_rating: number;
+  review_count: number;
+}
 
 export default function CustomerDashboard() {
   const { customer, loading, logout } = useCustomerAuth();
@@ -24,6 +36,8 @@ export default function CustomerDashboard() {
   const [reviewComment, setReviewComment] = useState("");
   const [submittingReview, setSubmittingReview] = useState(false);
   const [reviewedBookings, setReviewedBookings] = useState<Set<string>>(new Set());
+  const [salons, setSalons] = useState<DiscoverBusiness[]>([]);
+  const [loadingSalons, setLoadingSalons] = useState(true);
 
   useEffect(() => {
     if (!loading && !customer) {
@@ -39,6 +53,16 @@ export default function CustomerDashboard() {
       .catch(() => {})
       .finally(() => setFetching(false));
   }, [customer]);
+
+  useEffect(() => {
+    fetch("/api/discover")
+      .then((r) => r.json())
+      .then((data) => {
+        if (Array.isArray(data)) setSalons(data);
+      })
+      .catch(() => {})
+      .finally(() => setLoadingSalons(false));
+  }, []);
 
   const handleCancel = async (bookingId: string) => {
     if (!confirm("Cancel this booking?")) return;
@@ -108,6 +132,12 @@ export default function CustomerDashboard() {
             </Link>
             <div className="flex items-center gap-4">
               <span className="text-sm text-dark-500">Hi, {customer.name}</span>
+              <Link
+                href="/explore"
+                className="text-sm font-medium bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition"
+              >
+                Explore Salons
+              </Link>
               <Button size="sm" variant="ghost" onClick={logout}>
                 Sign Out
               </Button>
@@ -146,15 +176,45 @@ export default function CustomerDashboard() {
           </Card>
         </div>
 
+        {/* Find a Salon */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-dark-900">Find a Salon</h2>
+            <Link href="/explore" className="text-sm font-medium text-primary-600 hover:text-primary-700">
+              View all →
+            </Link>
+          </div>
+          {loadingSalons ? (
+            <p className="text-dark-400">Loading salons...</p>
+          ) : salons.length === 0 ? (
+            <p className="text-sm text-dark-400">No salons available right now.</p>
+          ) : (
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {salons.slice(0, 6).map((biz) => (
+                <BusinessCard
+                  key={biz.id}
+                  name={biz.name}
+                  slug={biz.slug}
+                  location={biz.location}
+                  category={biz.category}
+                  avatar_url={biz.avatar_url}
+                  avg_rating={Number(biz.avg_rating)}
+                  review_count={biz.review_count}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+
         {fetching ? (
           <p className="text-dark-400">Loading bookings...</p>
         ) : bookings.length === 0 ? (
           <Card>
             <CardContent className="py-12 text-center">
               <p className="text-dark-500 mb-4">You haven&apos;t booked any appointments yet.</p>
-              <p className="text-sm text-dark-400">
-                Ask your salon for their booking link to get started.
-              </p>
+              <Link href="/explore" className="text-sm font-medium text-primary-600 hover:text-primary-700">
+                Explore salons and book your first appointment →
+              </Link>
             </CardContent>
           </Card>
         ) : (

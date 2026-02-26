@@ -55,6 +55,9 @@ export default function CustomerLoginPage() {
       {/* Right form panel */}
       <div className="flex-1 flex items-center justify-center bg-dark-50 px-4 py-12">
         <div className="w-full max-w-md">
+          <Link href="/" className="inline-flex items-center gap-1 text-sm text-dark-500 hover:text-dark-700 mb-6">
+            ← Back to Home
+          </Link>
           <div className="text-center mb-8 lg:text-left">
             <div className="w-12 h-1 bg-accent-400 rounded-full mb-4 mx-auto lg:mx-0" />
             <h1 className="text-2xl font-bold text-dark-900">Customer Login</h1>
