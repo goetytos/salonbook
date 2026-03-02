@@ -39,19 +39,13 @@ export default function LandingPage() {
                 href="/customer/auth/login"
                 className="text-sm font-medium text-dark-600 hover:text-dark-900 transition"
               >
-                Customer Login
+                Sign In
               </Link>
               <Link
-                href="/auth/login"
-                className="text-sm font-medium text-dark-600 hover:text-dark-900 transition"
-              >
-                Owner Login
-              </Link>
-              <Link
-                href="/auth/signup"
+                href="/customer/auth/signup"
                 className="text-sm font-medium bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 hover:scale-[1.03] hover:shadow-md active:scale-[0.97] transition-all duration-200"
               >
-                Get Started
+                Sign Up
               </Link>
             </div>
           </div>
@@ -67,14 +61,13 @@ export default function LandingPage() {
             <div>
               <div className="w-16 h-1 bg-accent-400 rounded-full mb-6" />
               <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white tracking-tight leading-tight">
-                Manage your salon.
+                Find &amp; book
                 <br />
-                <span className="text-accent-300">Accept bookings online.</span>
+                <span className="text-accent-300">the best salons near you.</span>
               </h1>
               <p className="mt-6 text-lg sm:text-xl text-primary-100 max-w-xl">
-                SalonBook helps salons and barber shops in Kenya manage appointments,
-                services, and customers — all in one place. Your clients book online,
-                you focus on what you do best.
+                Discover top-rated salons and barber shops in Kenya. Browse services,
+                read reviews, pick your stylist, and book your appointment in seconds.
               </p>
 
               {/* Search Bar */}
@@ -108,16 +101,16 @@ export default function LandingPage() {
 
               <div className="mt-8 flex flex-col sm:flex-row gap-4">
                 <Link
-                  href="/auth/signup"
+                  href="/explore"
                   className="inline-flex items-center justify-center px-8 py-3 bg-white text-primary-700 font-semibold rounded-lg hover:bg-primary-50 hover:scale-[1.03] hover:shadow-xl active:scale-[0.97] transition-all duration-200 text-base shadow-lg"
                 >
-                  List Your Business
+                  Explore Salons
                 </Link>
                 <Link
-                  href="/explore"
+                  href="/customer/auth/signup"
                   className="inline-flex items-center justify-center px-8 py-3 border border-primary-400 text-white font-medium rounded-lg hover:bg-primary-700/50 hover:scale-[1.03] hover:shadow-md active:scale-[0.97] transition-all duration-200 text-base"
                 >
-                  Browse Salons
+                  Create Account
                 </Link>
               </div>
             </div>
@@ -136,19 +129,30 @@ export default function LandingPage() {
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-3xl font-bold text-dark-900">
-              Everything you need to run your salon
+              Booking made simple
             </h2>
             <p className="mt-4 text-lg text-dark-500">
-              Professional tools built for Kenyan salons and barber shops.
+              Everything you need to find the perfect salon and book in seconds.
             </p>
           </div>
           <div className="grid md:grid-cols-3 gap-8">
             {[
               {
-                title: "Online Booking",
-                desc: "Clients book appointments from their phone. No calls needed. Share your booking link on social media.",
+                title: "Discover Salons",
+                desc: "Browse top-rated salons and barber shops near you. Filter by category, location, or name to find the perfect fit.",
                 color: "from-primary-500 to-primary-600",
                 borderColor: "border-t-primary-500",
+                icon: (
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                ),
+              },
+              {
+                title: "Book Instantly",
+                desc: "Pick a service, choose your stylist, select a time slot, and confirm — all from your phone. No calls needed.",
+                color: "from-accent-400 to-accent-500",
+                borderColor: "border-t-accent-400",
                 icon: (
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -156,19 +160,8 @@ export default function LandingPage() {
                 ),
               },
               {
-                title: "Staff Management",
-                desc: "Add your team, assign services, set individual working hours. Customers can choose their stylist.",
-                color: "from-accent-400 to-accent-500",
-                borderColor: "border-t-accent-400",
-                icon: (
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-                  </svg>
-                ),
-              },
-              {
-                title: "Reviews & Ratings",
-                desc: "Build trust with customer reviews. Showcase your rating on your public profile.",
+                title: "Read Reviews",
+                desc: "See what other customers are saying. Ratings and reviews help you choose the right salon with confidence.",
                 color: "from-primary-400 to-primary-600",
                 borderColor: "border-t-primary-400",
                 icon: (
@@ -178,19 +171,19 @@ export default function LandingPage() {
                 ),
               },
               {
-                title: "Client CRM",
-                desc: "Notes, tags, booking history — know your customers. Track VIPs and regulars.",
+                title: "Choose Your Stylist",
+                desc: "View available staff, their specialties, and pick the one you love. Book with your favourite every time.",
                 color: "from-accent-500 to-accent-600",
                 borderColor: "border-t-accent-500",
                 icon: (
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
                   </svg>
                 ),
               },
               {
-                title: "Promotions",
-                desc: "Create promo codes with discounts. Drive bookings during slow periods.",
+                title: "Get Deals",
+                desc: "Salons offer promo codes and discounts. Apply them at checkout and save on your next appointment.",
                 color: "from-primary-500 to-primary-700",
                 borderColor: "border-t-primary-500",
                 icon: (
@@ -200,13 +193,13 @@ export default function LandingPage() {
                 ),
               },
               {
-                title: "Analytics",
-                desc: "Track revenue, bookings, popular services, and peak hours. Make data-driven decisions.",
+                title: "Track Your Bookings",
+                desc: "View upcoming appointments, check past visits, cancel or reschedule — all from your dashboard.",
                 color: "from-accent-400 to-accent-600",
                 borderColor: "border-t-accent-400",
                 icon: (
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
                   </svg>
                 ),
               },
@@ -253,18 +246,26 @@ export default function LandingPage() {
 
             <div className="relative">
               <h2 className="text-3xl font-bold text-white mb-4">
-                Ready to grow your salon?
+                Your next great look is a tap away
               </h2>
               <p className="text-primary-100 text-lg mb-8 max-w-xl mx-auto">
-                Join salons across Kenya already using SalonBook to manage
-                appointments and grow their business.
+                Join thousands of customers booking with the best salons and
+                barber shops across Kenya.
               </p>
-              <Link
-                href="/auth/signup"
-                className="inline-flex items-center px-8 py-3 bg-accent-500 text-white font-semibold rounded-lg hover:bg-accent-600 hover:scale-[1.03] hover:shadow-xl active:scale-[0.97] transition-all duration-200 shadow-lg"
-              >
-                Get Started — It&apos;s Free
-              </Link>
+              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                <Link
+                  href="/explore"
+                  className="inline-flex items-center justify-center px-8 py-3 bg-accent-500 text-white font-semibold rounded-lg hover:bg-accent-600 hover:scale-[1.03] hover:shadow-xl active:scale-[0.97] transition-all duration-200 shadow-lg"
+                >
+                  Find a Salon
+                </Link>
+                <Link
+                  href="/auth/signup"
+                  className="inline-flex items-center justify-center px-8 py-3 border border-white/30 text-white font-medium rounded-lg hover:bg-white/10 hover:scale-[1.03] active:scale-[0.97] transition-all duration-200"
+                >
+                  Own a salon? List your business
+                </Link>
+              </div>
             </div>
           </div>
         </div>
@@ -284,7 +285,10 @@ export default function LandingPage() {
             </div>
             <div className="flex items-center gap-4 text-sm text-dark-400">
               <Link href="/explore" className="hover:text-dark-600">Explore Salons</Link>
-              <Link href="/auth/signup" className="hover:text-dark-600">For Business Owners</Link>
+              <Link href="/customer/auth/signup" className="hover:text-dark-600">Create Account</Link>
+              <span className="text-dark-200">|</span>
+              <Link href="/auth/login" className="hover:text-dark-600">Salon Owner Login</Link>
+              <Link href="/auth/signup" className="hover:text-dark-600">List Your Business</Link>
             </div>
             <p className="text-sm text-dark-400">
               Built for salons and barber shops in Kenya.
