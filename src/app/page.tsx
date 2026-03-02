@@ -49,7 +49,7 @@ export default function LandingPage() {
               </Link>
               <Link
                 href="/auth/signup"
-                className="text-sm font-medium bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition"
+                className="text-sm font-medium bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 hover:scale-[1.03] hover:shadow-md active:scale-[0.97] transition-all duration-200"
               >
                 Get Started
               </Link>
@@ -99,7 +99,7 @@ export default function LandingPage() {
                   </div>
                   <button
                     type="submit"
-                    className="px-6 py-3 bg-accent-500 text-white font-medium rounded-lg hover:bg-accent-600 transition shadow-lg"
+                    className="px-6 py-3 bg-accent-500 text-white font-medium rounded-lg hover:bg-accent-600 hover:scale-[1.03] active:scale-[0.97] transition-all duration-200 shadow-lg cursor-pointer"
                   >
                     Search
                   </button>
@@ -109,13 +109,13 @@ export default function LandingPage() {
               <div className="mt-8 flex flex-col sm:flex-row gap-4">
                 <Link
                   href="/auth/signup"
-                  className="inline-flex items-center justify-center px-8 py-3 bg-white text-primary-700 font-semibold rounded-lg hover:bg-primary-50 transition text-base shadow-lg"
+                  className="inline-flex items-center justify-center px-8 py-3 bg-white text-primary-700 font-semibold rounded-lg hover:bg-primary-50 hover:scale-[1.03] hover:shadow-xl active:scale-[0.97] transition-all duration-200 text-base shadow-lg"
                 >
                   List Your Business
                 </Link>
                 <Link
                   href="/explore"
-                  className="inline-flex items-center justify-center px-8 py-3 border border-primary-400 text-white font-medium rounded-lg hover:bg-primary-700/50 transition text-base"
+                  className="inline-flex items-center justify-center px-8 py-3 border border-primary-400 text-white font-medium rounded-lg hover:bg-primary-700/50 hover:scale-[1.03] hover:shadow-md active:scale-[0.97] transition-all duration-200 text-base"
                 >
                   Browse Salons
                 </Link>
@@ -261,7 +261,7 @@ export default function LandingPage() {
               </p>
               <Link
                 href="/auth/signup"
-                className="inline-flex items-center px-8 py-3 bg-accent-500 text-white font-semibold rounded-lg hover:bg-accent-600 transition shadow-lg"
+                className="inline-flex items-center px-8 py-3 bg-accent-500 text-white font-semibold rounded-lg hover:bg-accent-600 hover:scale-[1.03] hover:shadow-xl active:scale-[0.97] transition-all duration-200 shadow-lg"
               >
                 Get Started — It&apos;s Free
               </Link>

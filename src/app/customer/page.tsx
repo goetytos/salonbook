@@ -134,7 +134,7 @@ export default function CustomerDashboard() {
               <span className="text-sm text-dark-500">Hi, {customer.name}</span>
               <Link
                 href="/explore"
-                className="text-sm font-medium bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition"
+                className="text-sm font-medium bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 hover:scale-[1.03] hover:shadow-md active:scale-[0.97] transition-all duration-200"
               >
                 Explore Salons
               </Link>

@@ -24,7 +24,7 @@ export default function BusinessCard({
   return (
     <Link
       href={`/profile/${slug}`}
-      className="block bg-white rounded-xl border border-dark-200 p-4 hover:shadow-md hover:border-primary-200 transition group"
+      className="block bg-white rounded-xl border border-dark-200 p-4 hover:shadow-md hover:border-primary-200 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 group"
     >
       <div className="flex items-start gap-3">
         <Avatar name={name} src={avatar_url} size="lg" />

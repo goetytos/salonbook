@@ -77,7 +77,7 @@ export default function ExplorePage() {
               </Link>
               <Link
                 href="/auth/signup"
-                className="text-sm font-medium bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700"
+                className="text-sm font-medium bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 hover:scale-[1.03] hover:shadow-md active:scale-[0.97] transition-all duration-200"
               >
                 List Your Business
               </Link>
@@ -112,7 +112,7 @@ export default function ExplorePage() {
             <button
               key={cat.value}
               onClick={() => setCategory(cat.value)}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition ${
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium cursor-pointer transition-all duration-200 hover:scale-[1.05] active:scale-[0.95] ${
                 category === cat.value
                   ? "bg-primary-600 text-white shadow-md"
                   : "bg-white border border-dark-200 text-dark-600 hover:border-primary-300 hover:shadow-sm"
