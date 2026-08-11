@@ -9,6 +9,44 @@ function isLocalHost(value: string): boolean {
   return LOCAL_HOSTS.has(value.toLowerCase());
 }
 
+function isPrivateContainerAddress(value: string): boolean {
+  const normalized = value.toLowerCase();
+  if (normalized.startsWith("fc") || normalized.startsWith("fd")) return true;
+
+  const octets = normalized.split(".").map(Number);
+  if (
+    octets.length !== 4 ||
+    octets.some((octet) => !Number.isInteger(octet) || octet < 0 || octet > 255)
+  ) {
+    return false;
+  }
+
+  return (
+    octets[0] === 10 ||
+    (octets[0] === 172 && octets[1] >= 16 && octets[1] <= 31) ||
+    (octets[0] === 192 && octets[1] === 168)
+  );
+}
+
+function isTrustedGitHubActionsServiceAddress(value: string): boolean {
+  if (
+    process.env.CI !== "true" ||
+    process.env.GITHUB_ACTIONS !== "true" ||
+    !isPrivateContainerAddress(value)
+  ) {
+    return false;
+  }
+
+  const rawUrl = process.env.TEST_DATABASE_URL;
+  if (!rawUrl) return false;
+  try {
+    assertSafeTestDatabaseUrl(rawUrl);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** Refuse to connect unless the target is unmistakably a local test database. */
 export function assertSafeTestDatabaseUrl(rawUrl: string): string {
   const connectionString = rawUrl.trim();
@@ -82,7 +120,11 @@ export function assertSafeConnectedDatabase(
   }
 
   // PostgreSQL reports NULL for a local Unix-domain socket connection.
-  if (serverAddress !== null && !LOCAL_SERVER_ADDRESSES.has(serverAddress)) {
+  if (
+    serverAddress !== null &&
+    !LOCAL_SERVER_ADDRESSES.has(serverAddress) &&
+    !isTrustedGitHubActionsServiceAddress(serverAddress)
+  ) {
     throw new Error(
       "Refusing integration database: connected PostgreSQL server is not local"
     );
