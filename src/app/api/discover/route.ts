@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { query } from "@/lib/db";
+import { logServerError } from "@/lib/server/logging";
 import { errorResponse, sanitize } from "@/lib/validation";
 
 function escapeLikePattern(value: string): string {
@@ -43,7 +44,8 @@ export async function GET(request: NextRequest) {
 
     const businesses = await query(sql, params);
     return Response.json(businesses);
-  } catch {
+  } catch (error) {
+    logServerError("api.discover.database", error);
     return errorResponse("Failed to search businesses", 500);
   }
 }

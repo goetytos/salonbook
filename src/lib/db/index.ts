@@ -1,4 +1,5 @@
 import { Pool } from "pg";
+import { logServerError } from "@/lib/server/logging";
 
 let pool: Pool | null = null;
 
@@ -35,10 +36,7 @@ export function getPool(): Pool {
   });
 
   pool.on("error", (error) => {
-    console.error("Unexpected database pool error", {
-      name: error.name,
-      code: "code" in error ? error.code : undefined,
-    });
+    logServerError("database.pool.idle-client", error);
   });
 
   return pool;
