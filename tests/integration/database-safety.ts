@@ -9,30 +9,10 @@ function isLocalHost(value: string): boolean {
   return LOCAL_HOSTS.has(value.toLowerCase());
 }
 
-function isPrivateContainerAddress(value: string): boolean {
-  const normalized = value.toLowerCase().replace(/^::ffff:/, "");
-  if (normalized.startsWith("fc") || normalized.startsWith("fd")) return true;
-
-  const octets = normalized.split(".").map(Number);
-  if (
-    octets.length !== 4 ||
-    octets.some((octet) => !Number.isInteger(octet) || octet < 0 || octet > 255)
-  ) {
-    return false;
-  }
-
-  return (
-    octets[0] === 10 ||
-    (octets[0] === 172 && octets[1] >= 16 && octets[1] <= 31) ||
-    (octets[0] === 192 && octets[1] === 168)
-  );
-}
-
-function isTrustedGitHubActionsServiceAddress(value: string): boolean {
+function isTrustedGitHubActionsService(): boolean {
   if (
     process.env.CI !== "true" ||
-    process.env.GITHUB_ACTIONS !== "true" ||
-    !isPrivateContainerAddress(value)
+    process.env.GITHUB_ACTIONS !== "true"
   ) {
     return false;
   }
@@ -123,7 +103,7 @@ export function assertSafeConnectedDatabase(
   if (
     serverAddress !== null &&
     !LOCAL_SERVER_ADDRESSES.has(serverAddress) &&
-    !isTrustedGitHubActionsServiceAddress(serverAddress)
+    !isTrustedGitHubActionsService()
   ) {
     throw new Error(
       "Refusing integration database: connected PostgreSQL server is not local"

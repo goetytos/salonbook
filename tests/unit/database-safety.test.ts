@@ -26,26 +26,28 @@ describe("integration database server safety", () => {
     ).toThrow(/server is not local/);
   });
 
-  it("allows a private service-container address only for a local CI URL", () => {
+  it("allows a service-container address only for a local GitHub Actions URL", () => {
     process.env.CI = "true";
     process.env.GITHUB_ACTIONS = "true";
     process.env.TEST_DATABASE_URL =
       "postgresql://postgres:postgres@127.0.0.1:5432/salonbook_test_ci";
 
     expect(() =>
-      assertSafeConnectedDatabase("salonbook_test_ci", "::ffff:172.18.0.2")
+      assertSafeConnectedDatabase("salonbook_test_ci", "198.51.100.8")
     ).not.toThrow();
   });
 
-  it("still rejects public server addresses and non-test databases in CI", () => {
+  it("still rejects non-local URLs and non-test databases in CI", () => {
     process.env.CI = "true";
     process.env.GITHUB_ACTIONS = "true";
-    process.env.TEST_DATABASE_URL =
-      "postgresql://postgres:postgres@127.0.0.1:5432/salonbook_test_ci";
+    process.env.TEST_DATABASE_URL = "postgresql://example.com/salonbook_test_ci";
 
     expect(() =>
       assertSafeConnectedDatabase("salonbook_test_ci", "8.8.8.8")
     ).toThrow(/server is not local/);
+
+    process.env.TEST_DATABASE_URL =
+      "postgresql://postgres:postgres@127.0.0.1:5432/salonbook_test_ci";
     expect(() =>
       assertSafeConnectedDatabase("salonbook", "172.18.0.2")
     ).toThrow(/not a SalonBook test database/);
