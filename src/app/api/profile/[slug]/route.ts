@@ -9,6 +9,12 @@ export async function GET(
 ) {
   try {
     const { slug } = await params;
+    if (
+      slug.length > 255 ||
+      !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)
+    ) {
+      return errorResponse("Business not found", 404);
+    }
     const profile = await getPublicBusinessProfile(slug);
     if (!profile) return errorResponse("Business not found", 404);
     return Response.json(profile);

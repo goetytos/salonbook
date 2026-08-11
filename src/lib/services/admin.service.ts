@@ -111,7 +111,7 @@ export async function getPlatformStats(): Promise<PlatformStats> {
        (SELECT COUNT(*) FROM businesses WHERE status = 'active')::int as active_businesses,
        (SELECT COUNT(*) FROM businesses WHERE status = 'suspended')::int as suspended_businesses,
        (SELECT COUNT(*) FROM bookings)::int as total_bookings,
-       (SELECT COALESCE(SUM(s.price), 0) FROM bookings b JOIN services s ON b.service_id = s.id WHERE b.status != 'Cancelled')::numeric as total_revenue`
+       (SELECT COALESCE(SUM(final_price), 0) FROM bookings WHERE status = 'Completed')::numeric as total_revenue`
   );
   return stats!;
 }

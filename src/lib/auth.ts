@@ -1,9 +1,18 @@
 import jwt, { type Secret, type SignOptions } from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import { NextRequest } from "next/server";
+import { queryOne } from "@/lib/db";
 
-const JWT_SECRET: Secret = process.env.JWT_SECRET || "dev-secret-change-in-production";
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "7d";
+const JWT_ALGORITHM = "HS256" as const;
+const JWT_ISSUER = "salonbook";
+const JWT_AUDIENCE = "salonbook-web";
+const MINIMUM_JWT_SECRET_BYTES = 32;
+const DISALLOWED_JWT_SECRETS = new Set([
+  "dev-secret-change-in-production",
+  "change-me",
+  "changeme",
+  "secret",
+]);
 
 export type UserRole = "business" | "customer" | "admin";
 
@@ -13,6 +22,50 @@ export interface JWTPayload {
   role: UserRole;
   // Legacy alias — business routes read this
   businessId?: string;
+}
+
+function getJwtSecret(): Secret {
+  const secret = process.env.JWT_SECRET;
+
+  if (
+    !secret ||
+    secret !== secret.trim() ||
+    Buffer.byteLength(secret, "utf8") < MINIMUM_JWT_SECRET_BYTES ||
+    DISALLOWED_JWT_SECRETS.has(secret.toLowerCase())
+  ) {
+    throw new Error(
+      `JWT_SECRET must be configured with at least ${MINIMUM_JWT_SECRET_BYTES} bytes and must not be a placeholder`
+    );
+  }
+
+  return secret;
+}
+
+function assertJwtPayload(payload: unknown): asserts payload is JWTPayload {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    throw new jwt.JsonWebTokenError("Invalid token payload");
+  }
+
+  const candidate = payload as Record<string, unknown>;
+  const validRole =
+    candidate.role === "business" ||
+    candidate.role === "customer" ||
+    candidate.role === "admin";
+
+  if (
+    typeof candidate.id !== "string" ||
+    candidate.id.trim().length === 0 ||
+    typeof candidate.email !== "string" ||
+    candidate.email.trim().length === 0 ||
+    candidate.email.length > 320 ||
+    !candidate.email.includes("@") ||
+    !validRole ||
+    (candidate.businessId !== undefined &&
+      (typeof candidate.businessId !== "string" ||
+        candidate.businessId.trim().length === 0))
+  ) {
+    throw new jwt.JsonWebTokenError("Invalid token payload");
+  }
 }
 
 /** Hash a plaintext password */
@@ -30,13 +83,28 @@ export async function verifyPassword(
 
 /** Sign a JWT */
 export function signToken(payload: JWTPayload): string {
-  const options: SignOptions = { expiresIn: JWT_EXPIRES_IN as string & SignOptions["expiresIn"] };
-  return jwt.sign(payload as object, JWT_SECRET, options);
+  assertJwtPayload(payload);
+
+  const options: SignOptions = {
+    algorithm: JWT_ALGORITHM,
+    issuer: JWT_ISSUER,
+    audience: JWT_AUDIENCE,
+    expiresIn: (process.env.JWT_EXPIRES_IN || "7d") as SignOptions["expiresIn"],
+  };
+
+  return jwt.sign(payload as object, getJwtSecret(), options);
 }
 
 /** Verify and decode a JWT */
 export function verifyToken(token: string): JWTPayload {
-  return jwt.verify(token, JWT_SECRET) as JWTPayload;
+  const payload = jwt.verify(token, getJwtSecret(), {
+    algorithms: [JWT_ALGORITHM],
+    issuer: JWT_ISSUER,
+    audience: JWT_AUDIENCE,
+  });
+
+  assertJwtPayload(payload);
+  return payload;
 }
 
 /** Parse the JWT from an Authorization header. Returns null if missing/invalid. */
@@ -59,12 +127,39 @@ export function getAuthBusinessId(request: NextRequest): string | null {
   return payload.businessId || payload.id;
 }
 
-/** Require business-owner authentication — throws Response if unauthorized */
-export function requireAuth(request: NextRequest): string {
+/**
+ * Resolve a business token against the current account lifecycle state.
+ * Pending businesses may finish setup; suspended or deleted businesses cannot
+ * keep using an older, otherwise-valid token.
+ */
+export async function getAuthorizedBusinessId(
+  request: NextRequest
+): Promise<string | null> {
   const businessId = getAuthBusinessId(request);
-  if (!businessId) {
+  if (!businessId) return null;
+
+  const business = await queryOne<{ status: string }>(
+    "SELECT status FROM businesses WHERE id = $1",
+    [businessId]
+  );
+
+  return business && business.status !== "suspended" ? businessId : null;
+}
+
+/** Require business-owner authentication — throws Response if unauthorized */
+export async function requireAuth(request: NextRequest): Promise<string> {
+  const tokenBusinessId = getAuthBusinessId(request);
+  if (!tokenBusinessId) {
     throw new Response(JSON.stringify({ error: "Unauthorized" }), {
       status: 401,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  const businessId = await getAuthorizedBusinessId(request);
+  if (!businessId) {
+    throw new Response(JSON.stringify({ error: "Business account is unavailable" }), {
+      status: 403,
       headers: { "Content-Type": "application/json" },
     });
   }
@@ -83,8 +178,8 @@ export function requireCustomerAuth(request: NextRequest): string {
   return payload.id;
 }
 
-/** Require admin authentication — throws Response if unauthorized */
-export function requireAdminAuth(request: NextRequest): string {
+/** Require a still-existing admin account, invalidating stale deleted tokens. */
+export async function requireAdminAuth(request: NextRequest): Promise<string> {
   const payload = getAuthPayload(request);
   if (!payload || payload.role !== "admin") {
     throw new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -92,5 +187,15 @@ export function requireAdminAuth(request: NextRequest): string {
       headers: { "Content-Type": "application/json" },
     });
   }
-  return payload.id;
+  const admin = await queryOne<{ id: string }>(
+    "SELECT id FROM admins WHERE id = $1",
+    [payload.id]
+  );
+  if (!admin) {
+    throw new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+  return admin.id;
 }

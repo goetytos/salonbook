@@ -7,7 +7,13 @@ import { errorResponse } from "@/lib/validation";
 export async function GET(request: NextRequest) {
   try {
     const slug = new URL(request.url).searchParams.get("slug");
-    if (!slug) return errorResponse("Slug parameter required");
+    if (
+      !slug ||
+      slug.length > 255 ||
+      !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)
+    ) {
+      return errorResponse("A valid slug parameter is required");
+    }
 
     const business = await getBusinessBySlug(slug);
     if (!business) return errorResponse("Business not found", 404);

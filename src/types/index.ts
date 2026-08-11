@@ -59,6 +59,10 @@ export interface Booking {
   no_show?: boolean;
   notes?: string;
   promotion_id?: string;
+  service_name_snapshot?: string;
+  service_price_snapshot?: number;
+  discount_amount?: number;
+  final_price?: number;
   // Joined fields
   service_name?: string;
   service_price?: number;
@@ -248,7 +252,6 @@ export interface CreateReviewRequest {
   booking_id: string;
   rating: number;
   comment?: string;
-  staff_id?: string;
 }
 
 export interface CreatePromotionRequest {

@@ -1,14 +1,16 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api-client";
-import Card, { CardContent } from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
-import Modal from "@/components/ui/Modal";
-import Input from "@/components/ui/Input";
-import Select from "@/components/ui/Select";
+import Card, { CardContent } from "@/components/ui/Card";
 import EmptyState from "@/components/ui/EmptyState";
+import Input from "@/components/ui/Input";
+import Modal from "@/components/ui/Modal";
+import Select from "@/components/ui/Select";
+import DashboardState from "@/components/dashboard/DashboardState";
+import PageHeader from "@/components/dashboard/PageHeader";
 import type { BlockedDate, Staff } from "@/types";
 
 export default function BlockedDatesPage() {
@@ -16,9 +18,10 @@ export default function BlockedDatesPage() {
   const [blockedDates, setBlockedDates] = useState<BlockedDate[]>([]);
   const [staffList, setStaffList] = useState<Staff[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [actionError, setActionError] = useState("");
+  const [removing, setRemoving] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
-
-  // Form state
   const [date, setDate] = useState("");
   const [staffId, setStaffId] = useState("");
   const [startTime, setStartTime] = useState("");
@@ -26,29 +29,41 @@ export default function BlockedDatesPage() {
   const [reason, setReason] = useState("");
   const [saving, setSaving] = useState(false);
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (showLoading = true) => {
     if (!business) return;
+    if (showLoading) setLoading(true);
+    setError("");
     try {
       const [blocked, staff] = await Promise.all([
         api.get<BlockedDate[]>(`/businesses/${business.id}/blocked-dates`),
         api.get<Staff[]>(`/businesses/${business.id}/staff`),
       ]);
       setBlockedDates(blocked);
-      setStaffList(staff.filter((s) => s.active));
-    } catch {
-      // silent
+      setStaffList(staff.filter((member) => member.active));
+    } catch (requestError) {
+      setBlockedDates([]);
+      setError(requestError instanceof Error ? requestError.message : "Unavailable dates could not be loaded.");
     } finally {
       setLoading(false);
     }
   }, [business]);
 
   useEffect(() => {
-    fetchData();
+    void fetchData();
   }, [fetchData]);
+
+  const resetForm = () => {
+    setDate("");
+    setStaffId("");
+    setStartTime("");
+    setEndTime("");
+    setReason("");
+  };
 
   const handleCreate = async () => {
     if (!business || !date) return;
     setSaving(true);
+    setActionError("");
     try {
       await api.post(`/businesses/${business.id}/blocked-dates`, {
         date,
@@ -58,14 +73,10 @@ export default function BlockedDatesPage() {
         reason: reason || undefined,
       });
       setModalOpen(false);
-      setDate("");
-      setStaffId("");
-      setStartTime("");
-      setEndTime("");
-      setReason("");
-      await fetchData();
-    } catch {
-      // silent
+      resetForm();
+      await fetchData(false);
+    } catch (requestError) {
+      setActionError(requestError instanceof Error ? requestError.message : "The unavailable time could not be saved.");
     } finally {
       setSaving(false);
     }
@@ -73,144 +84,127 @@ export default function BlockedDatesPage() {
 
   const handleDelete = async (blockedId: string) => {
     if (!business || !confirm("Remove this blocked date?")) return;
+    setRemoving(blockedId);
+    setActionError("");
     try {
       await api.delete(`/businesses/${business.id}/blocked-dates?blocked_id=${blockedId}`);
-      await fetchData();
-    } catch {
-      // silent
+      await fetchData(false);
+    } catch (requestError) {
+      setActionError(requestError instanceof Error ? requestError.message : "The unavailable time could not be removed.");
+    } finally {
+      setRemoving(null);
     }
   };
 
   const today = new Date().toISOString().split("T")[0];
+  const formatDate = (value: string) => new Date(`${value.split("T")[0]}T00:00:00`).toLocaleDateString("en-KE", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-dark-900">Blocked Dates</h1>
-          <p className="text-dark-500 text-sm mt-1">
-            Block off dates when you or your staff are unavailable
-          </p>
-        </div>
-        <Button onClick={() => setModalOpen(true)}>Block Date</Button>
+      <PageHeader
+        eyebrow="Availability"
+        title="Blocked dates"
+        description="Protect time for leave, private commitments and pauses in the studio schedule."
+        actions={<Button onClick={() => { setActionError(""); setModalOpen(true); }}>Block time</Button>}
+      />
+
+      <div className="mb-6 flex gap-3 rounded-2xl border border-primary-200 bg-primary-50 p-4 text-sm leading-6 text-primary-900">
+        <svg className="mt-0.5 h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M8 7V3m8 4V3M5 11h14M7 21h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v12a2 2 0 002 2z" />
+        </svg>
+        <p>Choose all staff to close the business for that period, or assign the block to one team member.</p>
       </div>
 
+      {actionError && !modalOpen && (
+        <div className="mb-5">
+          <DashboardState type="error" title="The schedule was not changed" description={actionError} />
+        </div>
+      )}
+
       {loading ? (
-        <p className="text-dark-400">Loading...</p>
+        <DashboardState type="loading" title="Loading blocked dates" />
+      ) : error ? (
+        <DashboardState type="error" title="Availability unavailable" description={error} onRetry={() => void fetchData()} />
       ) : blockedDates.length === 0 ? (
         <Card>
-          <CardContent>
+          <CardContent className="p-2 sm:p-2">
             <EmptyState
               icon={
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
                 </svg>
               }
-              title="No blocked dates"
-              description="Block off dates when you can't accept bookings, like holidays or personal days."
-              actionLabel="Block a Date"
-              onAction={() => setModalOpen(true)}
+              title="No time blocked"
+              description="Your current working schedule is available for bookings. Add a block whenever plans change."
+              actionLabel="Block time"
+              onAction={() => { setActionError(""); setModalOpen(true); }}
             />
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-3">
-          {blockedDates.map((bd) => (
-            <Card key={bd.id}>
-              <CardContent>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium text-dark-900">
-                      {new Date(bd.date + "T00:00:00").toLocaleDateString("en-KE", {
-                        weekday: "long",
-                        month: "long",
-                        day: "numeric",
-                        year: "numeric",
-                      })}
-                    </p>
-                    <div className="flex items-center gap-2 mt-1">
-                      {bd.staff_name && (
-                        <span className="text-sm text-dark-500">{bd.staff_name}</span>
-                      )}
-                      {bd.start_time && bd.end_time && (
-                        <span className="text-sm text-dark-500">
-                          {bd.start_time.slice(0, 5)} - {bd.end_time.slice(0, 5)}
-                        </span>
-                      )}
-                      {!bd.start_time && (
-                        <span className="text-sm text-dark-400">Full day</span>
-                      )}
-                    </div>
-                    {bd.reason && (
-                      <p className="text-sm text-dark-400 mt-1">{bd.reason}</p>
-                    )}
+        <section className="grid gap-4 lg:grid-cols-2" aria-label="Unavailable dates">
+          {blockedDates.map((blockedDate) => {
+            const busy = removing === blockedDate.id;
+            const fullDay = !blockedDate.start_time || !blockedDate.end_time;
+            return (
+              <Card key={blockedDate.id}>
+                <CardContent className="flex h-full flex-col gap-5 sm:flex-row sm:items-start">
+                  <div className="flex h-16 w-16 shrink-0 flex-col items-center justify-center rounded-xl bg-primary-900 text-white" aria-hidden="true">
+                    <span className="text-[0.62rem] font-bold uppercase tracking-[0.14em]">
+                      {new Date(`${blockedDate.date.split("T")[0]}T00:00:00`).toLocaleDateString("en-KE", { month: "short" })}
+                    </span>
+                    <span className="font-display text-2xl font-semibold leading-none">
+                      {new Date(`${blockedDate.date.split("T")[0]}T00:00:00`).getDate()}
+                    </span>
                   </div>
-                  <Button
-                    size="sm"
-                    variant="danger"
-                    onClick={() => handleDelete(bd.id)}
-                  >
-                    Remove
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                  <div className="min-w-0 flex-1">
+                    <h2 className="font-semibold text-dark-900">{formatDate(blockedDate.date)}</h2>
+                    <p className="mt-2 text-sm font-medium text-dark-700">
+                      {fullDay ? "Full day" : `${blockedDate.start_time?.slice(0, 5)} – ${blockedDate.end_time?.slice(0, 5)}`}
+                    </p>
+                    <p className="mt-1 text-sm text-dark-500">{blockedDate.staff_name || "All staff"}</p>
+                    {blockedDate.reason && <p className="mt-3 rounded-lg bg-dark-50 px-3 py-2 text-sm leading-6 text-dark-600">{blockedDate.reason}</p>}
+                    <div className="mt-4 flex items-center gap-3" aria-busy={busy || undefined}>
+                      <Button size="sm" variant="danger" disabled={busy} onClick={() => void handleDelete(blockedDate.id)}>Remove block</Button>
+                      {busy && <span className="text-xs text-dark-500" role="status">Removing…</span>}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </section>
       )}
 
-      <Modal
-        open={modalOpen}
-        onClose={() => setModalOpen(false)}
-        title="Block a Date"
-      >
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Block time">
         <div className="space-y-4">
-          <Input
-            label="Date"
-            type="date"
-            min={today}
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-          />
+          {actionError && (
+            <p className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700" role="alert">{actionError}</p>
+          )}
+          <Input label="Date" type="date" min={today} value={date} onChange={(event) => setDate(event.target.value)} autoFocus />
           {staffList.length > 0 && (
             <Select
-              label="Staff Member (optional)"
+              label="Staff member (optional)"
               value={staffId}
-              onChange={(e) => setStaffId(e.target.value)}
+              onChange={(event) => setStaffId(event.target.value)}
               placeholder="All staff"
-              options={staffList.map((s) => ({ value: s.id, label: s.name }))}
+              options={staffList.map((staff) => ({ value: staff.id, label: staff.name }))}
             />
           )}
-          <div className="grid grid-cols-2 gap-3">
-            <Input
-              label="Start Time (optional)"
-              type="time"
-              value={startTime}
-              onChange={(e) => setStartTime(e.target.value)}
-            />
-            <Input
-              label="End Time (optional)"
-              type="time"
-              value={endTime}
-              onChange={(e) => setEndTime(e.target.value)}
-            />
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Input label="Start time (optional)" type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} />
+            <Input label="End time (optional)" type="time" value={endTime} onChange={(event) => setEndTime(event.target.value)} />
           </div>
-          <p className="text-xs text-dark-400">
-            Leave times empty to block the entire day
-          </p>
-          <Input
-            label="Reason (optional)"
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            placeholder="e.g. Public holiday"
-          />
-          <div className="flex gap-3 pt-2">
-            <Button onClick={handleCreate} loading={saving} disabled={!date}>
-              Block Date
-            </Button>
-            <Button variant="secondary" onClick={() => setModalOpen(false)}>
-              Cancel
-            </Button>
+          <p className="text-xs leading-5 text-dark-500">Leave both times empty to block the full day.</p>
+          <Input label="Reason (optional)" value={reason} onChange={(event) => setReason(event.target.value)} placeholder="e.g. Public holiday" />
+          <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
+            <Button variant="secondary" onClick={() => setModalOpen(false)}>Cancel</Button>
+            <Button onClick={() => void handleCreate()} loading={saving} disabled={!date}>Block time</Button>
           </div>
         </div>
       </Modal>

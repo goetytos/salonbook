@@ -1,6 +1,6 @@
 "use client";
 
-import { InputHTMLAttributes, forwardRef } from "react";
+import { InputHTMLAttributes, forwardRef, useId } from "react";
 
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: string;
@@ -8,8 +8,24 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
 }
 
 const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ label, error, className = "", id, ...props }, ref) => {
-    const inputId = id || label?.toLowerCase().replace(/\s+/g, "-");
+  (
+    {
+      label,
+      error,
+      className = "",
+      id,
+      "aria-describedby": ariaDescribedBy,
+      "aria-invalid": ariaInvalid,
+      ...props
+    },
+    ref
+  ) => {
+    const generatedId = useId();
+    const inputId = id || generatedId;
+    const errorId = `${inputId}-error`;
+    const describedBy = [ariaDescribedBy, error ? errorId : undefined]
+      .filter(Boolean)
+      .join(" ") || undefined;
 
     return (
       <div className="space-y-1">
@@ -21,17 +37,23 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
         <input
           ref={ref}
           id={inputId}
+          aria-describedby={describedBy}
+          aria-invalid={error ? true : ariaInvalid}
           className={`
-            w-full px-3 py-2 border rounded-lg text-dark-900
+            min-h-11 w-full px-3 py-2 border rounded-lg text-dark-900
             placeholder:text-dark-400
-            focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500
+            focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:border-primary-500
             disabled:bg-dark-50 disabled:cursor-not-allowed
-            ${error ? "border-red-300 focus:ring-red-500" : "border-dark-200"}
+            ${error ? "border-red-300 focus-visible:ring-red-500 focus-visible:border-red-500" : "border-dark-200"}
             ${className}
           `}
           {...props}
         />
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && (
+          <p id={errorId} className="text-sm text-red-600" role="alert">
+            {error}
+          </p>
+        )}
       </div>
     );
   }

@@ -1,6 +1,6 @@
 "use client";
 
-import { TextareaHTMLAttributes, forwardRef } from "react";
+import { TextareaHTMLAttributes, forwardRef, useId } from "react";
 
 interface TextareaProps extends TextareaHTMLAttributes<HTMLTextAreaElement> {
   label?: string;
@@ -8,8 +8,24 @@ interface TextareaProps extends TextareaHTMLAttributes<HTMLTextAreaElement> {
 }
 
 const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
-  ({ label, error, className = "", id, ...props }, ref) => {
-    const textareaId = id || label?.toLowerCase().replace(/\s+/g, "-");
+  (
+    {
+      label,
+      error,
+      className = "",
+      id,
+      "aria-describedby": ariaDescribedBy,
+      "aria-invalid": ariaInvalid,
+      ...props
+    },
+    ref
+  ) => {
+    const generatedId = useId();
+    const textareaId = id || generatedId;
+    const errorId = `${textareaId}-error`;
+    const describedBy = [ariaDescribedBy, error ? errorId : undefined]
+      .filter(Boolean)
+      .join(" ") || undefined;
 
     return (
       <div className="space-y-1">
@@ -21,18 +37,24 @@ const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
         <textarea
           ref={ref}
           id={textareaId}
+          aria-describedby={describedBy}
+          aria-invalid={error ? true : ariaInvalid}
           className={`
-            w-full px-3 py-2 border rounded-lg text-dark-900
+            min-h-11 w-full px-3 py-2 border rounded-lg text-dark-900
             placeholder:text-dark-400
-            focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500
+            focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:border-primary-500
             disabled:bg-dark-50 disabled:cursor-not-allowed
-            ${error ? "border-red-300 focus:ring-red-500" : "border-dark-200"}
+            ${error ? "border-red-300 focus-visible:ring-red-500 focus-visible:border-red-500" : "border-dark-200"}
             ${className}
           `}
           rows={3}
           {...props}
         />
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && (
+          <p id={errorId} className="text-sm text-red-600" role="alert">
+            {error}
+          </p>
+        )}
       </div>
     );
   }

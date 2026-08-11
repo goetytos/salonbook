@@ -1,8 +1,12 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useAdminAuth } from "@/lib/admin-auth-context";
+import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
+import Card, { CardContent, CardHeader } from "@/components/ui/Card";
+import DashboardState from "@/components/dashboard/DashboardState";
+import PageHeader from "@/components/dashboard/PageHeader";
 
 interface BusinessRow {
   id: string;
@@ -18,181 +22,180 @@ interface BusinessRow {
   customer_count: number;
 }
 
-const STATUS_BADGE: Record<string, string> = {
-  active: "bg-green-100 text-green-800",
-  pending: "bg-amber-100 text-amber-800",
-  suspended: "bg-red-100 text-red-800",
-};
+type StatusFilter = "" | "pending" | "active" | "suspended";
 
 function adminFetchWithToken<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = typeof window !== "undefined" ? localStorage.getItem("salonbook_admin_token") : null;
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-    ...(options.headers as Record<string, string>),
-  };
-  if (token) headers["Authorization"] = `Bearer ${token}`;
-  return fetch(`/api/admin${path}`, { ...options, headers }).then(async (res) => {
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({ error: "Request failed" }));
-      throw new Error(body.error);
+  const headers: Record<string, string> = { "Content-Type": "application/json", ...(options.headers as Record<string, string>) };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  return fetch(`/api/admin${path}`, { ...options, headers }).then(async (response) => {
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({ error: "Request failed" }));
+      throw new Error(body.error || `HTTP ${response.status}`);
     }
-    return res.json();
+    return response.json();
   });
 }
 
 export default function AdminDashboard() {
   const { stats, refreshStats } = useAdminAuth();
   const [businesses, setBusinesses] = useState<BusinessRow[]>([]);
-  const [filter, setFilter] = useState("");
+  const [filter, setFilter] = useState<StatusFilter>("");
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [actionError, setActionError] = useState("");
   const [updating, setUpdating] = useState<string | null>(null);
 
-  const fetchBusinesses = useCallback(async () => {
+  const fetchBusinesses = useCallback(async (showLoading = true) => {
+    if (showLoading) setLoading(true);
+    setError("");
     try {
       const params = filter ? `?status=${filter}` : "";
       const data = await adminFetchWithToken<BusinessRow[]>(`/businesses${params}`);
       setBusinesses(data);
-    } catch {
-      // failed to load
+    } catch (requestError) {
+      setBusinesses([]);
+      setError(requestError instanceof Error ? requestError.message : "Businesses could not be loaded.");
     } finally {
       setLoading(false);
     }
   }, [filter]);
 
   useEffect(() => {
-    fetchBusinesses();
+    void fetchBusinesses();
   }, [fetchBusinesses]);
 
   const updateStatus = async (businessId: string, status: string) => {
     setUpdating(businessId);
+    setActionError("");
     try {
-      await adminFetchWithToken(`/businesses/${businessId}`, {
-        method: "PATCH",
-        body: JSON.stringify({ status }),
-      });
-      await fetchBusinesses();
-      await refreshStats();
-    } catch {
-      // update failed
+      await adminFetchWithToken(`/businesses/${businessId}`, { method: "PATCH", body: JSON.stringify({ status }) });
+      await Promise.all([fetchBusinesses(false), refreshStats()]);
+    } catch (requestError) {
+      setActionError(requestError instanceof Error ? requestError.message : "The business status could not be updated.");
     } finally {
       setUpdating(null);
     }
   };
 
   const statCards = [
-    { label: "Total Businesses", value: stats?.total_businesses ?? "—", color: "bg-dark-800 text-white" },
-    { label: "Pending Approval", value: stats?.pending_businesses ?? "—", color: "bg-amber-50 text-amber-800 border border-amber-200" },
-    { label: "Active", value: stats?.active_businesses ?? "—", color: "bg-green-50 text-green-800 border border-green-200" },
-    { label: "Suspended", value: stats?.suspended_businesses ?? "—", color: "bg-red-50 text-red-800 border border-red-200" },
-    { label: "Total Bookings", value: stats?.total_bookings ?? "—", color: "bg-primary-50 text-primary-800 border border-primary-200" },
-    { label: "Total Revenue", value: stats?.total_revenue != null ? `KES ${Number(stats.total_revenue).toLocaleString()}` : "—", color: "bg-accent-50 text-accent-800 border border-accent-200" },
+    { label: "Businesses", value: stats?.total_businesses ?? "—", detail: "All registered accounts", className: "border-primary-300 bg-primary-900 text-white" },
+    { label: "Pending", value: stats?.pending_businesses ?? "—", detail: "Awaiting review", className: "border-amber-200 bg-amber-50 text-amber-900" },
+    { label: "Active", value: stats?.active_businesses ?? "—", detail: "Currently available", className: "border-green-200 bg-green-50 text-green-900" },
+    { label: "Suspended", value: stats?.suspended_businesses ?? "—", detail: "Access restricted", className: "border-red-200 bg-red-50 text-red-900" },
+    { label: "Bookings", value: stats?.total_bookings ?? "—", detail: "Platform total", className: "border-dark-200 bg-surface text-dark-900" },
+    { label: "Revenue", value: stats?.total_revenue != null ? `KES ${Number(stats.total_revenue).toLocaleString()}` : "—", detail: "Platform total", className: "border-accent-300 bg-accent-50 text-dark-900" },
   ];
 
-  return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-bold text-dark-900">Platform Dashboard</h1>
-        <p className="text-dark-500 mt-1">Manage businesses and monitor platform activity</p>
-      </div>
+  const statusVariant = (status: string) => status === "active" ? "success" as const : status === "pending" ? "warning" as const : status === "suspended" ? "danger" as const : "default" as const;
+  const formatDate = (value: string) => new Date(value).toLocaleDateString("en-KE", { month: "short", day: "numeric", year: "numeric" });
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-        {statCards.map((card) => (
-          <div key={card.label} className={`rounded-xl p-4 ${card.color}`}>
-            <p className="text-sm opacity-80">{card.label}</p>
-            <p className="text-2xl font-bold mt-1">{card.value}</p>
+  return (
+    <div>
+      <PageHeader eyebrow="Platform operations" title="Business access" description="Review account status and monitor the activity moving through SalonBook." />
+
+      <section className="mb-7 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6" aria-label="Platform totals">
+        {statCards.map((card, index) => (
+          <div key={card.label} className={`rounded-2xl border p-4 ${card.className} ${index === 5 ? "col-span-2 md:col-span-1" : ""}`}>
+            <p className="text-[0.65rem] font-bold uppercase tracking-[0.13em] opacity-70">{card.label}</p>
+            <p className="mt-3 font-display text-2xl font-semibold tabular-nums tracking-[-0.035em]">{card.value}</p>
+            <p className="mt-1 text-xs opacity-70">{card.detail}</p>
           </div>
         ))}
-      </div>
+      </section>
 
-      {/* Businesses Table */}
-      <div className="bg-white rounded-xl border border-dark-200 shadow-sm">
-        <div className="p-4 border-b border-dark-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <h2 className="text-lg font-semibold text-dark-900">Businesses</h2>
-          <div className="flex gap-2">
-            {["", "pending", "active", "suspended"].map((f) => (
+      {actionError && <div className="mb-5"><DashboardState type="error" title="The account status was not changed" description={actionError} /></div>}
+
+      <Card className="overflow-hidden">
+        <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h2 className="font-display text-xl font-semibold text-dark-900">Business directory</h2>
+            <p className="mt-1 text-xs text-dark-500">Filter registrations before making an access decision.</p>
+          </div>
+          <div className="flex max-w-full gap-1 overflow-x-auto rounded-xl bg-dark-50 p-1" role="group" aria-label="Filter businesses by status">
+            {(["", "pending", "active", "suspended"] as StatusFilter[]).map((option) => (
               <button
-                key={f}
-                onClick={() => setFilter(f)}
-                className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
-                  filter === f
-                    ? "bg-dark-800 text-white"
-                    : "bg-dark-100 text-dark-600 hover:bg-dark-200"
-                }`}
+                key={option}
+                type="button"
+                aria-pressed={filter === option}
+                onClick={() => setFilter(option)}
+                className={`min-h-11 shrink-0 rounded-lg px-3 text-sm font-bold capitalize transition-colors ${filter === option ? "bg-primary-900 text-white" : "text-dark-500 hover:bg-white hover:text-dark-800"}`}
               >
-                {f || "All"}
+                {option || "All"}
               </button>
             ))}
           </div>
-        </div>
+        </CardHeader>
 
         {loading ? (
-          <div className="p-8 text-center text-dark-400">Loading businesses...</div>
+          <CardContent><DashboardState type="loading" title="Loading businesses" /></CardContent>
+        ) : error ? (
+          <CardContent><DashboardState type="error" title="Business directory unavailable" description={error} onRetry={() => void fetchBusinesses()} /></CardContent>
         ) : businesses.length === 0 ? (
-          <div className="p-8 text-center text-dark-400">No businesses found</div>
+          <CardContent><DashboardState title={`No ${filter || "matching"} businesses`} description="Try another status filter or check again after new registrations arrive." /></CardContent>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-dark-200 bg-dark-50">
-                  <th className="text-left p-3 font-medium text-dark-600">Business</th>
-                  <th className="text-left p-3 font-medium text-dark-600">Location</th>
-                  <th className="text-left p-3 font-medium text-dark-600">Status</th>
-                  <th className="text-left p-3 font-medium text-dark-600">Bookings</th>
-                  <th className="text-left p-3 font-medium text-dark-600">Customers</th>
-                  <th className="text-left p-3 font-medium text-dark-600">Joined</th>
-                  <th className="text-right p-3 font-medium text-dark-600">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {businesses.map((biz) => (
-                  <tr key={biz.id} className="border-b border-dark-100 hover:bg-dark-50">
-                    <td className="p-3">
-                      <div className="font-medium text-dark-900">{biz.name}</div>
-                      <div className="text-dark-400 text-xs">{biz.email}</div>
-                    </td>
-                    <td className="p-3 text-dark-600">{biz.location}</td>
-                    <td className="p-3">
-                      <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_BADGE[biz.status] || "bg-dark-100 text-dark-600"}`}>
-                        {biz.status}
-                      </span>
-                    </td>
-                    <td className="p-3 text-dark-600">{biz.booking_count}</td>
-                    <td className="p-3 text-dark-600">{biz.customer_count}</td>
-                    <td className="p-3 text-dark-400 text-xs">
-                      {new Date(biz.created_at).toLocaleDateString()}
-                    </td>
-                    <td className="p-3 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        {biz.status !== "active" && (
-                          <Button
-                            size="sm"
-                            variant="primary"
-                            loading={updating === biz.id}
-                            onClick={() => updateStatus(biz.id, "active")}
-                          >
-                            Activate
-                          </Button>
-                        )}
-                        {biz.status !== "suspended" && (
-                          <Button
-                            size="sm"
-                            variant="danger"
-                            loading={updating === biz.id}
-                            onClick={() => updateStatus(biz.id, "suspended")}
-                          >
-                            Suspend
-                          </Button>
-                        )}
+          <>
+            <div className="divide-y divide-dark-200 md:hidden">
+              {businesses.map((business) => {
+                const busy = updating === business.id;
+                return (
+                  <article key={business.id} className="p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <h3 className="truncate font-semibold text-dark-900">{business.name}</h3>
+                        <p className="mt-1 truncate text-sm text-dark-500">{business.email}</p>
+                        <p className="mt-1 text-xs text-dark-500">{business.location} · Joined {formatDate(business.created_at)}</p>
                       </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                      <Badge variant={statusVariant(business.status)}>{business.status}</Badge>
+                    </div>
+                    <dl className="mt-4 grid grid-cols-2 gap-3 rounded-xl bg-dark-50 p-3 text-sm">
+                      <div><dt className="text-xs text-dark-500">Bookings</dt><dd className="mt-1 font-bold tabular-nums text-dark-900">{business.booking_count}</dd></div>
+                      <div><dt className="text-xs text-dark-500">Customers</dt><dd className="mt-1 font-bold tabular-nums text-dark-900">{business.customer_count}</dd></div>
+                    </dl>
+                    <div className="mt-4 flex flex-wrap gap-2" aria-busy={busy || undefined}>
+                      {business.status !== "active" && <Button size="sm" disabled={busy} onClick={() => void updateStatus(business.id, "active")}>Activate</Button>}
+                      {business.status !== "suspended" && <Button size="sm" variant="danger" disabled={busy} onClick={() => void updateStatus(business.id, "suspended")}>Suspend</Button>}
+                      {busy && <span className="self-center text-xs text-dark-500" role="status">Updating…</span>}
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+
+            <div className="hidden overflow-x-auto md:block">
+              <table className="w-full text-sm">
+                <caption className="sr-only">SalonBook business accounts</caption>
+                <thead><tr className="border-b border-dark-200 bg-dark-50">
+                  {['Business', 'Location', 'Status', 'Bookings', 'Customers', 'Joined'].map((heading) => <th key={heading} scope="col" className="px-5 py-3 text-left text-xs font-bold uppercase tracking-[0.1em] text-dark-500">{heading}</th>)}
+                  <th scope="col" className="px-5 py-3 text-right text-xs font-bold uppercase tracking-[0.1em] text-dark-500">Actions</th>
+                </tr></thead>
+                <tbody className="divide-y divide-dark-200">
+                  {businesses.map((business) => {
+                    const busy = updating === business.id;
+                    return (
+                      <tr key={business.id} className="hover:bg-dark-50/70">
+                        <td className="px-5 py-4"><p className="font-semibold text-dark-900">{business.name}</p><p className="mt-1 text-xs text-dark-500">{business.email} · {business.phone}</p></td>
+                        <td className="px-5 py-4 text-dark-700">{business.location}<span className="mt-1 block text-xs capitalize text-dark-400">{business.category?.replace("-", " ") || "Uncategorised"}</span></td>
+                        <td className="px-5 py-4"><Badge variant={statusVariant(business.status)}>{business.status}</Badge></td>
+                        <td className="px-5 py-4 font-semibold tabular-nums text-dark-700">{business.booking_count}</td>
+                        <td className="px-5 py-4 font-semibold tabular-nums text-dark-700">{business.customer_count}</td>
+                        <td className="whitespace-nowrap px-5 py-4 text-dark-500">{formatDate(business.created_at)}</td>
+                        <td className="px-5 py-4">
+                          <div className="flex justify-end gap-2" aria-busy={busy || undefined}>
+                            {business.status !== "active" && <Button size="sm" disabled={busy} onClick={() => void updateStatus(business.id, "active")}>Activate</Button>}
+                            {business.status !== "suspended" && <Button size="sm" variant="danger" disabled={busy} onClick={() => void updateStatus(business.id, "suspended")}>Suspend</Button>}
+                            {busy && <span className="sr-only" role="status">Updating {business.name}</span>}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
-      </div>
+      </Card>
     </div>
   );
 }

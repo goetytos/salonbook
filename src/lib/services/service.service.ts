@@ -4,7 +4,23 @@ import type { Service } from "@/types";
 /** Get all services for a business */
 export async function getServices(businessId: string): Promise<Service[]> {
   return query<Service>(
-    "SELECT * FROM services WHERE business_id = $1 ORDER BY created_at DESC",
+    `SELECT * FROM services
+     WHERE business_id = $1 AND (active IS NULL OR active = true)
+     ORDER BY created_at DESC`,
+    [businessId]
+  );
+}
+
+/** List active services only when the owning business is publicly active. */
+export async function getPublicServices(businessId: string): Promise<Service[]> {
+  return query<Service>(
+    `SELECT service.*
+     FROM services service
+     JOIN businesses business ON business.id = service.business_id
+     WHERE service.business_id = $1
+       AND service.active = true
+       AND business.status = 'active'
+     ORDER BY service.created_at DESC`,
     [businessId]
   );
 }
@@ -53,13 +69,15 @@ export async function updateService(
   );
 }
 
-/** Delete a service */
+/** Deactivate a service while preserving historical bookings */
 export async function deleteService(
   serviceId: string,
   businessId: string
 ): Promise<boolean> {
   const result = await queryOne<Service>(
-    "DELETE FROM services WHERE id = $1 AND business_id = $2 RETURNING id",
+    `UPDATE services SET active = false
+     WHERE id = $1 AND business_id = $2
+     RETURNING id`,
     [serviceId, businessId]
   );
   return !!result;

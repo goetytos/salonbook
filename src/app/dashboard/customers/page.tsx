@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api-client";
-import Card, { CardContent } from "@/components/ui/Card";
+import Card from "@/components/ui/Card";
 import SearchBar from "@/components/ui/SearchBar";
-import EmptyState from "@/components/ui/EmptyState";
+import Avatar from "@/components/ui/Avatar";
+import DashboardState from "@/components/dashboard/DashboardState";
+import PageHeader from "@/components/dashboard/PageHeader";
 
 interface CustomerRow {
   id: string;
@@ -21,102 +23,83 @@ export default function CustomersPage() {
   const { business } = useAuth();
   const [customers, setCustomers] = useState<CustomerRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [search, setSearch] = useState("");
 
-  useEffect(() => {
+  const fetchCustomers = useCallback(async () => {
     if (!business) return;
-    api
-      .get<CustomerRow[]>(`/businesses/${business.id}/customers`)
-      .then(setCustomers)
-      .catch(() => {})
-      .finally(() => setLoading(false));
+    setLoading(true);
+    setError("");
+    try {
+      setCustomers(await api.get<CustomerRow[]>(`/businesses/${business.id}/customers`));
+    } catch (requestError) {
+      setCustomers([]);
+      setError(requestError instanceof Error ? requestError.message : "Customer records could not be loaded.");
+    } finally {
+      setLoading(false);
+    }
   }, [business]);
 
-  const filtered = customers.filter(
-    (c) =>
-      c.name.toLowerCase().includes(search.toLowerCase()) ||
-      c.phone.includes(search)
-  );
+  useEffect(() => { void fetchCustomers(); }, [fetchCustomers]);
+
+  const filtered = customers.filter((customer) => customer.name.toLowerCase().includes(search.toLowerCase()) || customer.phone.includes(search));
+  const formatDate = (date: string) => date ? new Date(date).toLocaleDateString("en-KE", { month: "short", day: "numeric", year: "numeric" }) : "No visit yet";
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-dark-900">Customers</h1>
-          <p className="text-dark-500 text-sm mt-1">
-            Your client list, built automatically from bookings
-          </p>
-        </div>
-      </div>
+      <PageHeader eyebrow="Workspace" title="Customers" description="A customer directory built from completed and upcoming appointments." />
 
       {customers.length > 0 && (
-        <div className="mb-4">
-          <SearchBar
-            value={search}
-            onChange={setSearch}
-            placeholder="Search by name or phone..."
-            className="max-w-sm"
-          />
+        <div className="mb-5 max-w-md">
+          <SearchBar value={search} onChange={setSearch} label="Search customers by name or phone number" placeholder="Search by name or phone" />
         </div>
       )}
 
       {loading ? (
-        <p className="text-dark-400">Loading...</p>
+        <DashboardState type="loading" title="Loading customers" />
+      ) : error ? (
+        <DashboardState type="error" title="Customers unavailable" description={error} onRetry={fetchCustomers} />
       ) : customers.length === 0 ? (
-        <Card>
-          <CardContent>
-            <EmptyState
-              title="No customers yet"
-              description="Customers are added automatically when they book an appointment."
-            />
-          </CardContent>
-        </Card>
+        <DashboardState title="No customers yet" description="Customer records are created automatically after someone books an appointment." />
       ) : filtered.length === 0 ? (
-        <Card>
-          <CardContent className="py-8 text-center">
-            <p className="text-dark-500">No customers matching &quot;{search}&quot;</p>
-          </CardContent>
-        </Card>
+        <DashboardState title="No matching customers" description={`No customer name or phone number matches “${search}”.`} />
       ) : (
-        <Card>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-dark-100">
-                  <th className="text-left px-6 py-3 font-medium text-dark-500">Name</th>
-                  <th className="text-left px-6 py-3 font-medium text-dark-500">Phone</th>
-                  <th className="text-left px-6 py-3 font-medium text-dark-500">Bookings</th>
-                  <th className="text-left px-6 py-3 font-medium text-dark-500">Last Visit</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-dark-100">
-                {filtered.map((customer) => (
-                  <tr key={customer.id} className="hover:bg-dark-50 transition">
-                    <td className="px-6 py-3">
-                      <Link
-                        href={`/dashboard/customers/${customer.id}`}
-                        className="font-medium text-primary-600 hover:text-primary-700"
-                      >
-                        {customer.name}
-                      </Link>
-                    </td>
-                    <td className="px-6 py-3 text-dark-700">{customer.phone}</td>
-                    <td className="px-6 py-3 text-dark-700">{customer.booking_count}</td>
-                    <td className="px-6 py-3 text-dark-700">
-                      {customer.last_booking
-                        ? new Date(customer.last_booking).toLocaleDateString("en-KE", {
-                            month: "short",
-                            day: "numeric",
-                            year: "numeric",
-                          })
-                        : "—"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        <>
+          <div className="space-y-3 md:hidden">
+            {filtered.map((customer) => (
+              <Link key={customer.id} href={`/dashboard/customers/${customer.id}`} className="flex items-center gap-4 rounded-2xl border border-dark-200 bg-surface p-4 hover:border-primary-300">
+                <Avatar name={customer.name} />
+                <div className="min-w-0 flex-1">
+                  <h2 className="truncate font-semibold text-dark-900">{customer.name}</h2>
+                  <p className="mt-1 text-sm text-dark-500">{customer.phone}</p>
+                  <p className="mt-2 text-xs text-dark-400">{customer.booking_count} booking{customer.booking_count === 1 ? "" : "s"} · Last visit {formatDate(customer.last_booking)}</p>
+                </div>
+                <span className="text-primary-700" aria-hidden="true">→</span>
+              </Link>
+            ))}
           </div>
-        </Card>
+
+          <Card className="hidden overflow-hidden md:block">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <caption className="sr-only">Customer directory</caption>
+                <thead><tr className="border-b border-dark-200 bg-dark-50">
+                  {['Customer', 'Phone', 'Bookings', 'Last visit'].map((heading) => <th key={heading} scope="col" className="px-5 py-3 text-left text-xs font-bold uppercase tracking-[0.1em] text-dark-500">{heading}</th>)}
+                </tr></thead>
+                <tbody className="divide-y divide-dark-200">
+                  {filtered.map((customer) => (
+                    <tr key={customer.id} className="hover:bg-dark-50/70">
+                      <td className="px-5 py-4"><Link href={`/dashboard/customers/${customer.id}`} className="flex items-center gap-3 font-semibold text-dark-900 hover:text-primary-700"><Avatar name={customer.name} size="sm" />{customer.name}</Link></td>
+                      <td className="px-5 py-4 text-dark-700">{customer.phone}</td>
+                      <td className="px-5 py-4 font-mono tabular-nums text-dark-700">{customer.booking_count}</td>
+                      <td className="px-5 py-4 text-dark-700">{formatDate(customer.last_booking)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        </>
       )}
     </div>
   );

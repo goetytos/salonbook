@@ -9,7 +9,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const businessId = requireAuth(request);
+    const businessId = await requireAuth(request);
     const { id } = await params;
 
     if (businessId !== id) return errorResponse("Forbidden", 403);

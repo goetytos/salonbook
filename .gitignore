@@ -2,6 +2,10 @@ node_modules/
 .next/
 .env
 .env.local
+.env.*.local
 *.tsbuildinfo
 next-env.d.ts
 .vercel
+coverage/
+playwright-report/
+test-results/

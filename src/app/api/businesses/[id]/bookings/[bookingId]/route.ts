@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { requireAuth } from "@/lib/auth";
 import { updateBookingStatus } from "@/lib/services/booking.service";
 import { query } from "@/lib/db";
-import { errorResponse } from "@/lib/validation";
+import { errorResponse, validateUuid } from "@/lib/validation";
 
 // PATCH /api/businesses/[id]/bookings/[bookingId] — update booking status
 export async function PATCH(
@@ -10,10 +10,11 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string; bookingId: string }> }
 ) {
   try {
-    const businessId = requireAuth(request);
+    const businessId = await requireAuth(request);
     const { id, bookingId } = await params;
 
     if (businessId !== id) return errorResponse("Forbidden", 403);
+    if (!validateUuid(bookingId)) return errorResponse("Invalid booking identifier");
 
     const body = await request.json();
     const { status } = body;
@@ -28,8 +29,8 @@ export async function PATCH(
     // Fire cancellation notification (non-blocking)
     if (status === "Cancelled") {
       query<{ name: string; phone: string; service_name: string }>(
-        `SELECT c.name, c.phone, s.name as service_name
-         FROM bookings b JOIN customers c ON b.customer_id = c.id JOIN services s ON b.service_id = s.id
+        `SELECT c.name, c.phone, b.service_name_snapshot as service_name
+         FROM bookings b JOIN customers c ON b.customer_id = c.id
          WHERE b.id = $1`,
         [bookingId]
       )

@@ -11,6 +11,8 @@ import Select from "@/components/ui/Select";
 import Avatar from "@/components/ui/Avatar";
 import Badge from "@/components/ui/Badge";
 import EmptyState from "@/components/ui/EmptyState";
+import DashboardState from "@/components/dashboard/DashboardState";
+import PageHeader from "@/components/dashboard/PageHeader";
 import type { Staff, Service } from "@/types";
 
 export default function StaffPage() {
@@ -18,10 +20,9 @@ export default function StaffPage() {
   const [staffList, setStaffList] = useState<Staff[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
+  const [pageError, setPageError] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [editingStaff, setEditingStaff] = useState<Staff | null>(null);
-
-  // Form state
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -29,9 +30,12 @@ export default function StaffPage() {
   const [avatarUrl, setAvatarUrl] = useState("");
   const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState("");
 
   const fetchData = useCallback(async () => {
     if (!business) return;
+    setLoading(true);
+    setPageError("");
     try {
       const [staffData, servicesData] = await Promise.all([
         api.get<Staff[]>(`/businesses/${business.id}/staff`),
@@ -39,241 +43,149 @@ export default function StaffPage() {
       ]);
       setStaffList(staffData);
       setServices(servicesData);
-    } catch {
-      // silent
+    } catch (requestError) {
+      setStaffList([]);
+      setPageError(requestError instanceof Error ? requestError.message : "Team data could not be loaded.");
     } finally {
       setLoading(false);
     }
   }, [business]);
 
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  useEffect(() => { void fetchData(); }, [fetchData]);
 
   const openCreate = () => {
-    setEditingStaff(null);
-    setName("");
-    setEmail("");
-    setPhone("");
-    setRole("stylist");
-    setAvatarUrl("");
-    setSelectedServiceIds([]);
-    setModalOpen(true);
+    setEditingStaff(null); setName(""); setEmail(""); setPhone(""); setRole("stylist"); setAvatarUrl(""); setSelectedServiceIds([]); setFormError(""); setModalOpen(true);
   };
 
   const openEdit = (staff: Staff) => {
-    setEditingStaff(staff);
-    setName(staff.name);
-    setEmail(staff.email || "");
-    setPhone(staff.phone || "");
-    setRole(staff.role);
-    setAvatarUrl(staff.avatar_url || "");
-    setSelectedServiceIds(staff.service_ids || []);
-    setModalOpen(true);
+    setEditingStaff(staff); setName(staff.name); setEmail(staff.email || ""); setPhone(staff.phone || ""); setRole(staff.role); setAvatarUrl(staff.avatar_url || ""); setSelectedServiceIds(staff.service_ids || []); setFormError(""); setModalOpen(true);
   };
 
   const handleSave = async () => {
     if (!business || !name.trim()) return;
     setSaving(true);
+    setFormError("");
+    const payload = { name: name.trim(), email: email.trim() || undefined, phone: phone.trim() || undefined, role, avatar_url: avatarUrl.trim() || undefined, service_ids: selectedServiceIds };
     try {
-      const payload = {
-        name: name.trim(),
-        email: email.trim() || undefined,
-        phone: phone.trim() || undefined,
-        role,
-        avatar_url: avatarUrl.trim() || undefined,
-        service_ids: selectedServiceIds,
-      };
-
-      if (editingStaff) {
-        await api.put(`/businesses/${business.id}/staff/${editingStaff.id}`, payload);
-      } else {
-        await api.post(`/businesses/${business.id}/staff`, payload);
-      }
+      if (editingStaff) await api.put(`/businesses/${business.id}/staff/${editingStaff.id}`, payload);
+      else await api.post(`/businesses/${business.id}/staff`, payload);
       setModalOpen(false);
       await fetchData();
-    } catch {
-      // silent
+    } catch (requestError) {
+      setFormError(requestError instanceof Error ? requestError.message : "The team member could not be saved.");
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = async (staffId: string) => {
-    if (!business || !confirm("Deactivate this staff member?")) return;
+    if (!business || !window.confirm("Deactivate this staff member?")) return;
+    setPageError("");
     try {
       await api.delete(`/businesses/${business.id}/staff/${staffId}`);
       await fetchData();
-    } catch {
-      // silent
+    } catch (requestError) {
+      setPageError(requestError instanceof Error ? requestError.message : "The team member could not be deactivated.");
     }
   };
 
-  const toggleServiceId = (id: string) => {
-    setSelectedServiceIds((prev) =>
-      prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]
-    );
-  };
-
-  const activeStaff = staffList.filter((s) => s.active);
-  const inactiveStaff = staffList.filter((s) => !s.active);
+  const toggleServiceId = (id: string) => setSelectedServiceIds((current) => current.includes(id) ? current.filter((serviceId) => serviceId !== id) : [...current, id]);
+  const activeStaff = staffList.filter((staff) => staff.active);
+  const inactiveStaff = staffList.filter((staff) => !staff.active);
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-dark-900">Staff</h1>
-          <p className="text-dark-500 text-sm mt-1">Manage your team members</p>
-        </div>
-        <Button onClick={openCreate}>Add Staff</Button>
-      </div>
+      <PageHeader eyebrow="Workspace" title="Team" description="Assign staff to the services they perform and keep the booking experience accurate." actions={<Button onClick={openCreate}>Add team member</Button>} />
 
       {loading ? (
-        <p className="text-dark-400">Loading...</p>
-      ) : activeStaff.length === 0 && inactiveStaff.length === 0 ? (
-        <Card>
-          <CardContent>
-            <EmptyState
-              icon={
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-              }
-              title="No staff members yet"
-              description="Add your team members to assign them to services and bookings."
-              actionLabel="Add Staff"
-              onAction={openCreate}
-            />
-          </CardContent>
-        </Card>
+        <DashboardState type="loading" title="Loading team" />
+      ) : pageError ? (
+        <DashboardState type="error" title="Team unavailable" description={pageError} onRetry={fetchData} />
+      ) : staffList.length === 0 ? (
+        <Card><CardContent><EmptyState title="No team members yet" description="Add the people customers can choose when booking a service." actionLabel="Add team member" onAction={openCreate} /></CardContent></Card>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {activeStaff.map((staff) => (
-            <Card key={staff.id}>
-              <CardContent>
-                <div className="flex items-start gap-3">
-                  <Avatar name={staff.name} src={staff.avatar_url} size="lg" />
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-dark-900 truncate">{staff.name}</h3>
-                    <p className="text-sm text-dark-500 capitalize">{staff.role}</p>
-                    {staff.phone && (
-                      <p className="text-xs text-dark-400 mt-1">{staff.phone}</p>
-                    )}
-                    {staff.service_ids && staff.service_ids.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-2">
-                        {staff.service_ids.slice(0, 3).map((sid) => {
-                          const svc = services.find((s) => s.id === sid);
-                          return svc ? (
-                            <Badge key={sid} variant="default">{svc.name}</Badge>
-                          ) : null;
-                        })}
-                        {staff.service_ids.length > 3 && (
-                          <Badge variant="default">+{staff.service_ids.length - 3}</Badge>
-                        )}
+        <>
+          <section aria-labelledby="active-team-heading">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 id="active-team-heading" className="text-sm font-bold uppercase tracking-[0.14em] text-dark-600">Active team</h2>
+              <span className="font-mono text-sm text-dark-500">{activeStaff.length}</span>
+            </div>
+            {activeStaff.length === 0 ? (
+              <DashboardState title="No active staff" description="Add a team member to make stylist selection available to customers." />
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
+                {activeStaff.map((staff) => (
+                  <Card key={staff.id}>
+                    <CardContent className="py-5">
+                      <div className="flex items-start gap-4">
+                        <Avatar name={staff.name} src={staff.avatar_url} size="lg" />
+                        <div className="min-w-0 flex-1">
+                          <h3 className="truncate text-lg font-semibold text-dark-900">{staff.name}</h3>
+                          <p className="mt-1 text-sm capitalize text-dark-500">{staff.role}</p>
+                          {staff.phone && <p className="mt-2 text-xs text-dark-500">{staff.phone}</p>}
+                        </div>
                       </div>
-                    )}
-                  </div>
-                </div>
-                <div className="flex gap-2 mt-4">
-                  <Button size="sm" variant="secondary" onClick={() => openEdit(staff)}>
-                    Edit
-                  </Button>
-                  <Button size="sm" variant="danger" onClick={() => handleDelete(staff.id)}>
-                    Deactivate
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-          {inactiveStaff.map((staff) => (
-            <Card key={staff.id} className="opacity-60">
-              <CardContent>
-                <div className="flex items-start gap-3">
-                  <Avatar name={staff.name} src={staff.avatar_url} size="lg" />
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-dark-900">{staff.name}</h3>
+                      {staff.service_ids && staff.service_ids.length > 0 && (
+                        <div className="mt-4 flex flex-wrap gap-1.5 border-t border-dark-200 pt-4">
+                          {staff.service_ids.slice(0, 3).map((serviceId) => {
+                            const service = services.find((item) => item.id === serviceId);
+                            return service ? <Badge key={serviceId}>{service.name}</Badge> : null;
+                          })}
+                          {staff.service_ids.length > 3 && <Badge>+{staff.service_ids.length - 3}</Badge>}
+                        </div>
+                      )}
+                      <div className="mt-5 flex gap-2">
+                        <Button size="sm" variant="secondary" onClick={() => openEdit(staff)}>Edit</Button>
+                        <Button size="sm" variant="danger" onClick={() => handleDelete(staff.id)}>Deactivate</Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </section>
+
+          {inactiveStaff.length > 0 && (
+            <section className="mt-10" aria-labelledby="inactive-team-heading">
+              <h2 id="inactive-team-heading" className="mb-4 text-sm font-bold uppercase tracking-[0.14em] text-dark-500">Inactive</h2>
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                {inactiveStaff.map((staff) => (
+                  <div key={staff.id} className="flex items-center gap-3 rounded-xl border border-dark-200 bg-dark-50 p-4">
+                    <Avatar name={staff.name} src={staff.avatar_url} />
+                    <div className="min-w-0"><p className="truncate font-semibold text-dark-700">{staff.name}</p><p className="mt-1 text-xs capitalize text-dark-500">{staff.role}</p></div>
                     <Badge variant="danger">Inactive</Badge>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                ))}
+              </div>
+            </section>
+          )}
+        </>
       )}
 
-      {/* Create/Edit Modal */}
-      <Modal
-        open={modalOpen}
-        onClose={() => setModalOpen(false)}
-        title={editingStaff ? "Edit Staff" : "Add Staff"}
-      >
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editingStaff ? "Edit team member" : "Add team member"}>
+        {formError && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700" role="alert">{formError}</div>}
         <div className="space-y-4">
-          <Input
-            label="Name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="e.g. Jane Wanjiku"
-          />
-          <Input
-            label="Email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="jane@example.com"
-          />
-          <Input
-            label="Phone"
-            type="tel"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            placeholder="07XXXXXXXX"
-          />
-          <Select
-            label="Role"
-            value={role}
-            onChange={(e) => setRole(e.target.value)}
-            options={[
-              { value: "stylist", label: "Stylist" },
-              { value: "barber", label: "Barber" },
-              { value: "manager", label: "Manager" },
-              { value: "receptionist", label: "Receptionist" },
-            ]}
-          />
-          <Input
-            label="Avatar URL"
-            value={avatarUrl}
-            onChange={(e) => setAvatarUrl(e.target.value)}
-            placeholder="https://example.com/photo.jpg"
-          />
+          <Input label="Name" value={name} onChange={(event) => setName(event.target.value)} placeholder="e.g. Jane Wanjiku" required />
+          <Input label="Email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="jane@example.com" />
+          <Input label="Phone" type="tel" value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="07XXXXXXXX" />
+          <Select label="Role" value={role} onChange={(event) => setRole(event.target.value)} options={[{ value: "stylist", label: "Stylist" }, { value: "barber", label: "Barber" }, { value: "manager", label: "Manager" }, { value: "receptionist", label: "Receptionist" }]} />
+          <Input label="Avatar URL" value={avatarUrl} onChange={(event) => setAvatarUrl(event.target.value)} placeholder="https://example.com/photo.jpg" />
           {services.length > 0 && (
-            <div className="space-y-1">
-              <label className="block text-sm font-medium text-dark-700">
-                Assigned Services
-              </label>
-              <div className="space-y-2 max-h-40 overflow-y-auto">
+            <fieldset>
+              <legend className="text-sm font-medium text-dark-700">Assigned services</legend>
+              <div className="mt-2 max-h-44 space-y-1 overflow-y-auto rounded-xl border border-dark-200 p-2">
                 {services.map((service) => (
-                  <label key={service.id} className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={selectedServiceIds.includes(service.id)}
-                      onChange={() => toggleServiceId(service.id)}
-                      className="rounded border-dark-300 text-primary-600 focus:ring-primary-500"
-                    />
-                    <span className="text-sm text-dark-700">
-                      {service.name} ({service.duration_minutes}min)
-                    </span>
+                  <label key={service.id} className="flex min-h-11 cursor-pointer items-center gap-3 rounded-lg px-2 hover:bg-dark-50">
+                    <input type="checkbox" checked={selectedServiceIds.includes(service.id)} onChange={() => toggleServiceId(service.id)} className="h-4 w-4 rounded border-dark-300 text-primary-600 focus:ring-primary-500" />
+                    <span className="text-sm text-dark-700">{service.name} · {service.duration_minutes} min</span>
                   </label>
                 ))}
               </div>
-            </div>
+            </fieldset>
           )}
-          <div className="flex gap-3 pt-2">
-            <Button onClick={handleSave} loading={saving} disabled={!name.trim()}>
-              {editingStaff ? "Update" : "Create"}
-            </Button>
-            <Button variant="secondary" onClick={() => setModalOpen(false)}>
-              Cancel
-            </Button>
+          <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
+            <Button variant="secondary" onClick={() => setModalOpen(false)}>Cancel</Button>
+            <Button onClick={handleSave} loading={saving} disabled={!name.trim()}>{editingStaff ? "Save changes" : "Add team member"}</Button>
           </div>
         </div>
       </Modal>

@@ -1,31 +1,58 @@
 import { Pool } from "pg";
 
-// Singleton connection pool — works with Supabase, Neon, or any PostgreSQL
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  max: 10,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 5000,
-  ssl: process.env.DATABASE_URL?.includes("supabase.co")
-    ? { rejectUnauthorized: false }
-    : undefined,
-});
+let pool: Pool | null = null;
 
-pool.on("error", (err) => {
-  console.error("Unexpected database pool error:", err);
-});
+function normalizedConnectionString(): string {
+  const value = process.env.DATABASE_URL?.replace(/\\n$/, "").trim();
+  if (!value) {
+    throw new Error("DATABASE_URL is required for database operations");
+  }
+  return value;
+}
 
-export default pool;
+function configuredPoolSize(): number {
+  const parsed = Number.parseInt(process.env.DB_POOL_MAX || "3", 10);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.min(parsed, 10) : 3;
+}
+
+/** Lazily create the server-side pool so builds never fall back to a local DB. */
+export function getPool(): Pool {
+  if (pool) return pool;
+
+  const connectionString = normalizedConnectionString();
+  pool = new Pool({
+    connectionString,
+    max: configuredPoolSize(),
+    idleTimeoutMillis: 20_000,
+    connectionTimeoutMillis: 10_000,
+    query_timeout: 20_000,
+    statement_timeout: 15_000,
+    allowExitOnIdle: true,
+    application_name: "salonbook-web",
+    ssl: connectionString.includes("supabase.co")
+      ? { rejectUnauthorized: true }
+      : undefined,
+  });
+
+  pool.on("error", (error) => {
+    console.error("Unexpected database pool error", {
+      name: error.name,
+      code: "code" in error ? error.code : undefined,
+    });
+  });
+
+  return pool;
+}
 
 // Helper to run a single query
 export async function query<T>(text: string, params?: unknown[]): Promise<T[]> {
-  const result = await pool.query(text, params);
+  const result = await getPool().query(text, params);
   return result.rows as T[];
 }
 
 // Helper to run a single query and return one row
 export async function queryOne<T>(text: string, params?: unknown[]): Promise<T | null> {
-  const result = await pool.query(text, params);
+  const result = await getPool().query(text, params);
   return (result.rows[0] as T) ?? null;
 }
 
@@ -33,7 +60,7 @@ export async function queryOne<T>(text: string, params?: unknown[]): Promise<T |
 export async function transaction<T>(
   fn: (client: import("pg").PoolClient) => Promise<T>
 ): Promise<T> {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     await client.query("BEGIN");
     const result = await fn(client);

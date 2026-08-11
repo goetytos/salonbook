@@ -1,13 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCustomerAuth } from "@/lib/customer-auth-context";
-import Input from "@/components/ui/Input";
+import AuthShell from "@/components/auth/AuthShell";
 import Button from "@/components/ui/Button";
-import SalonBackground from "@/components/ui/SalonBackground";
-import { ScissorsIcon } from "@/components/icons/SalonIcons";
+import Input from "@/components/ui/Input";
 
 export default function CustomerSignupPage() {
   const router = useRouter();
@@ -16,113 +15,44 @@ export default function CustomerSignupPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
     setError("");
     setLoading(true);
-
     try {
       await signup(form);
       router.push("/customer");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Registration failed");
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "We couldn’t create your account.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex flex-col lg:flex-row">
-      {/* Left decorative panel */}
-      <div className="relative bg-gradient-to-br from-primary-800 via-primary-700 to-primary-600 lg:w-[40%] lg:min-h-screen overflow-hidden">
-        <SalonBackground variant="auth" />
-        <div className="relative z-10 px-6 py-8 lg:py-0 lg:flex lg:flex-col lg:justify-center lg:h-full lg:px-12">
-          <div className="flex items-center gap-2 mb-4">
-            <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
-              <ScissorsIcon className="w-5 h-5 text-white" />
-            </div>
-            <span className="text-xl font-bold text-white">SalonBook</span>
-          </div>
-          <h2 className="text-2xl lg:text-3xl font-bold text-white mb-2 hidden lg:block">
-            Book with ease
-          </h2>
-          <p className="text-primary-200 hidden lg:block">
-            Create an account to book appointments, track your history, and discover great salons.
-          </p>
-        </div>
-      </div>
-
-      {/* Right form panel */}
-      <div className="flex-1 flex items-center justify-center bg-dark-50 px-4 py-12">
-        <div className="w-full max-w-md">
-          <Link href="/" className="inline-flex items-center gap-1 text-sm text-dark-500 hover:text-dark-700 mb-6">
-            ← Back to Home
-          </Link>
-          <div className="text-center mb-8 lg:text-left">
-            <div className="w-12 h-1 bg-accent-400 rounded-full mb-4 mx-auto lg:mx-0" />
-            <h1 className="text-2xl font-bold text-dark-900">Create Customer Account</h1>
-            <p className="text-dark-500 mt-1">Book and manage your appointments</p>
-          </div>
-
-          <div className="bg-white rounded-xl border border-dark-200 shadow-sm p-6">
-            {error && (
-              <div className="mb-4 p-3 bg-red-50 text-red-700 text-sm rounded-lg border border-red-200">
-                {error}
-              </div>
-            )}
-
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <Input
-                label="Full Name"
-                placeholder="e.g. Jane Wanjiku"
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                required
-              />
-              <Input
-                label="Email"
-                type="email"
-                placeholder="you@example.com"
-                value={form.email}
-                onChange={(e) => setForm({ ...form, email: e.target.value })}
-                required
-              />
-              <Input
-                label="Password"
-                type="password"
-                placeholder="At least 8 characters"
-                value={form.password}
-                onChange={(e) => setForm({ ...form, password: e.target.value })}
-                required
-                minLength={8}
-              />
-              <Input
-                label="Phone Number"
-                placeholder="07XXXXXXXX"
-                value={form.phone}
-                onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                required
-              />
-              <Button type="submit" loading={loading} className="w-full">
-                Create Account
-              </Button>
-            </form>
-          </div>
-
-          <p className="text-center text-sm text-dark-500 mt-4">
-            Already have an account?{" "}
-            <Link href="/customer/auth/login" className="text-primary-600 font-medium hover:text-primary-700">
-              Sign in
-            </Link>
-          </p>
-          <p className="text-center text-sm text-dark-400 mt-2">
-            Are you a salon owner?{" "}
-            <Link href="/auth/signup" className="text-primary-600 font-medium hover:text-primary-700">
-              Owner signup
-            </Link>
-          </p>
-        </div>
-      </div>
-    </div>
+    <AuthShell
+      eyebrow="Create your account"
+      title="Make the next booking simpler."
+      description="Save your details once, keep track of appointments and return to studios you enjoyed."
+      panelEyebrow="Your personal booking desk"
+      panelTitle="Less searching through messages. More time for the visit."
+      panelDescription="A SalonBook account keeps the useful details together before, during and after every appointment."
+      highlights={["See upcoming and past bookings", "Cancel eligible appointments", "Rate completed visits"]}
+      footer={
+        <>
+          <p>Already have an account? <Link href="/customer/auth/login" className="font-bold text-primary-700 hover:underline">Sign in</Link></p>
+          <p className="mt-1">Joining as a business? <Link href="/auth/signup" className="font-bold text-primary-700 hover:underline">Create a business account</Link></p>
+        </>
+      }
+    >
+      {error && <p className="mb-5 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800" role="alert">{error}</p>}
+      <form onSubmit={handleSubmit} className="space-y-4" aria-busy={loading || undefined}>
+        <Input label="Full name" autoComplete="name" placeholder="e.g. Akinyi Wambui" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} required autoFocus />
+        <Input label="Email address" type="email" inputMode="email" autoComplete="email" placeholder="you@example.com" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} required />
+        <Input label="Password" type="password" autoComplete="new-password" placeholder="At least 8 characters" value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} required minLength={8} />
+        <Input label="Phone number" type="tel" inputMode="tel" autoComplete="tel" placeholder="07XXXXXXXX" value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} required />
+        <Button type="submit" loading={loading} className="w-full">Create customer account</Button>
+      </form>
+    </AuthShell>
   );
 }

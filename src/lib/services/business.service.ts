@@ -1,7 +1,11 @@
 import { query, queryOne } from "@/lib/db";
 import { hashPassword, verifyPassword, signToken } from "@/lib/auth";
-import { slugify } from "@/lib/validation";
-import type { Business, AuthResponse, DashboardStats } from "@/types";
+import {
+  getNairobiDateTime,
+  normalizeKenyanPhone,
+  slugify,
+} from "@/lib/validation";
+import type { Business, AuthResponse, DashboardStats, WorkingHours } from "@/types";
 
 /** Register a new business owner */
 export async function registerBusiness(
@@ -11,6 +15,9 @@ export async function registerBusiness(
   phone: string,
   location: string
 ): Promise<AuthResponse> {
+  const normalizedPhone = normalizeKenyanPhone(phone);
+  if (!normalizedPhone) throw new Error("Invalid phone number");
+
   // Check if email already exists
   const existing = await queryOne<Business>(
     "SELECT id FROM businesses WHERE email = $1",
@@ -34,7 +41,7 @@ export async function registerBusiness(
     `INSERT INTO businesses (name, slug, email, password_hash, phone, location, status)
      VALUES ($1, $2, $3, $4, $5, $6, 'pending')
      RETURNING *`,
-    [name, slug, email, passwordHash, phone, location]
+    [name, slug, email, passwordHash, normalizedPhone, location]
   );
 
   if (!business) throw new Error("Failed to create business");
@@ -59,6 +66,10 @@ export async function loginBusiness(
   const valid = await verifyPassword(password, business.password_hash);
   if (!valid) throw new Error("Invalid email or password");
 
+  if (business.status === "suspended") {
+    throw new Error("Business account is suspended");
+  }
+
   const token = signToken({ id: business.id, email: business.email, role: "business", businessId: business.id });
 
   const { password_hash: _, ...safe } = business;
@@ -78,6 +89,17 @@ export async function getBusinessById(
   return safe;
 }
 
+/** Get the active business schedule exposed to public booking pages. */
+export async function getPublicWorkingHours(
+  id: string
+): Promise<WorkingHours | null> {
+  const business = await queryOne<{ working_hours: WorkingHours }>(
+    "SELECT working_hours FROM businesses WHERE id = $1 AND status = 'active'",
+    [id]
+  );
+  return business?.working_hours || null;
+}
+
 /** Get business by slug (public — only active businesses) */
 export async function getBusinessBySlug(
   slug: string
@@ -94,7 +116,7 @@ export async function getBusinessBySlug(
 /** Update working hours */
 export async function updateWorkingHours(
   businessId: string,
-  workingHours: Record<string, unknown>
+  workingHours: WorkingHours
 ): Promise<Omit<Business, "password_hash"> | null> {
   const business = await queryOne<Business>(
     "UPDATE businesses SET working_hours = $1 WHERE id = $2 RETURNING *",
@@ -109,7 +131,7 @@ export async function updateWorkingHours(
 export async function getDashboardStats(
   businessId: string
 ): Promise<DashboardStats> {
-  const today = new Date().toISOString().split("T")[0];
+  const today = getNairobiDateTime().date;
   const monthStart = today.slice(0, 7) + "-01";
 
   const [totals] = await query<DashboardStats>(
@@ -119,8 +141,9 @@ export async function getDashboardStats(
        (SELECT COUNT(*) FROM bookings WHERE business_id = $1 AND date >= $2 AND status = 'Booked')::int as upcoming_bookings,
        (SELECT COUNT(*) FROM bookings WHERE business_id = $1 AND date >= $3 AND date <= $2)::int as monthly_bookings,
        (SELECT COUNT(DISTINCT customer_id) FROM bookings WHERE business_id = $1)::int as total_customers,
-       (SELECT COALESCE(SUM(s.price), 0) FROM bookings b JOIN services s ON b.service_id = s.id
-        WHERE b.business_id = $1 AND b.date >= $3 AND b.status != 'Cancelled')::numeric as monthly_revenue`,
+       (SELECT COALESCE(SUM(b.final_price), 0) FROM bookings b
+        WHERE b.business_id = $1 AND b.date >= $3 AND b.date <= $2
+          AND b.status = 'Completed')::numeric as monthly_revenue`,
     [businessId, today, monthStart]
   );
 
@@ -143,13 +166,13 @@ export async function updateBusinessProfile(
 ): Promise<Omit<Business, "password_hash"> | null> {
   const business = await queryOne<Business>(
     `UPDATE businesses SET
-      description = COALESCE($2, description),
-      category = COALESCE($3, category),
-      cover_image_url = COALESCE($4, cover_image_url),
-      avatar_url = COALESCE($5, avatar_url),
+      description = CASE WHEN $2::text IS NULL THEN description ELSE NULLIF($2, '') END,
+      category = CASE WHEN $3::text IS NULL THEN category ELSE NULLIF($3, '') END,
+      cover_image_url = CASE WHEN $4::text IS NULL THEN cover_image_url ELSE NULLIF($4, '') END,
+      avatar_url = CASE WHEN $5::text IS NULL THEN avatar_url ELSE NULLIF($5, '') END,
       buffer_minutes = COALESCE($6, buffer_minutes),
       cancellation_hours = COALESCE($7, cancellation_hours),
-      social_links = COALESCE($8, social_links),
+      social_links = COALESCE($8::jsonb, social_links),
       deposit_required = COALESCE($9, deposit_required)
      WHERE id = $1
      RETURNING *`,
@@ -172,12 +195,15 @@ export async function updateBusinessProfile(
 
 /** Get public business profile with services, staff, and review summary */
 export async function getPublicBusinessProfile(slug: string) {
-  const business = await queryOne<Business>(
-    "SELECT * FROM businesses WHERE slug = $1 AND status = 'active'",
+  const business = await queryOne<Omit<Business, "password_hash" | "email">>(
+    `SELECT id, name, slug, phone, location, working_hours, created_at,
+            description, cover_image_url, avatar_url, category, social_links,
+            cancellation_hours, deposit_required, buffer_minutes, status
+     FROM businesses
+     WHERE slug = $1 AND status = 'active'`,
     [slug]
   );
   if (!business) return null;
-  const { password_hash: _, ...safe } = business;
 
   const services = await query(
     "SELECT * FROM services WHERE business_id = $1 AND (active IS NULL OR active = true) ORDER BY created_at DESC",
@@ -185,7 +211,11 @@ export async function getPublicBusinessProfile(slug: string) {
   );
 
   const staff = await query(
-    "SELECT * FROM staff WHERE business_id = $1 AND active = true ORDER BY name",
+    `SELECT id, business_id, name, role, specialties, avatar_url,
+            working_hours, active, created_at
+     FROM staff
+     WHERE business_id = $1 AND active = true
+     ORDER BY name`,
     [business.id]
   );
 
@@ -197,7 +227,7 @@ export async function getPublicBusinessProfile(slug: string) {
   );
 
   return {
-    ...safe,
+    ...business,
     services,
     staff,
     avg_rating: Number(ratingResult?.avg_rating || 0),
@@ -208,12 +238,13 @@ export async function getPublicBusinessProfile(slug: string) {
 /** Get customers for a business */
 export async function getBusinessCustomers(businessId: string) {
   return query(
-    `SELECT DISTINCT c.*, COUNT(b.id)::int as booking_count,
+    `SELECT c.id, c.name, c.phone, c.email, c.created_at,
+            COUNT(b.id)::int as booking_count,
             MAX(b.date) as last_booking
      FROM customers c
      JOIN bookings b ON c.id = b.customer_id
      WHERE b.business_id = $1
-     GROUP BY c.id
+     GROUP BY c.id, c.name, c.phone, c.email, c.created_at
      ORDER BY last_booking DESC`,
     [businessId]
   );

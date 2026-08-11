@@ -5,7 +5,13 @@ import {
   createBlockedDate,
   deleteBlockedDate,
 } from "@/lib/services/blocked-date.service";
-import { sanitize, validateDateFormat, errorResponse } from "@/lib/validation";
+import {
+  sanitize,
+  validateDateFormat,
+  validateTimeFormat,
+  validateUuid,
+  errorResponse,
+} from "@/lib/validation";
 
 // GET /api/businesses/[id]/blocked-dates
 export async function GET(
@@ -13,7 +19,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const businessId = requireAuth(request);
+    const businessId = await requireAuth(request);
     const { id } = await params;
     if (businessId !== id) return errorResponse("Forbidden", 403);
 
@@ -36,13 +42,27 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const businessId = requireAuth(request);
+    const businessId = await requireAuth(request);
     const { id } = await params;
     if (businessId !== id) return errorResponse("Forbidden", 403);
 
     const body = await request.json();
     if (!body.date || !validateDateFormat(body.date)) {
       return errorResponse("Valid date is required (YYYY-MM-DD)");
+    }
+    if (body.staff_id && !validateUuid(body.staff_id)) {
+      return errorResponse("A valid staff_id is required");
+    }
+    const hasStart = body.start_time !== undefined && body.start_time !== "";
+    const hasEnd = body.end_time !== undefined && body.end_time !== "";
+    if (
+      hasStart !== hasEnd ||
+      (hasStart &&
+        (!validateTimeFormat(body.start_time) ||
+          !validateTimeFormat(body.end_time) ||
+          body.start_time >= body.end_time))
+    ) {
+      return errorResponse("Start and end time must form a valid time range");
     }
 
     const blocked = await createBlockedDate(id, {
@@ -55,6 +75,12 @@ export async function POST(
     return Response.json(blocked, { status: 201 });
   } catch (error) {
     if (error instanceof Response) return error;
+    if (
+      error instanceof Error &&
+      error.message === "Staff member is unavailable for this business"
+    ) {
+      return errorResponse(error.message, 400);
+    }
     return errorResponse("Failed to create blocked date", 500);
   }
 }
@@ -65,7 +91,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const businessId = requireAuth(request);
+    const businessId = await requireAuth(request);
     const { id } = await params;
     if (businessId !== id) return errorResponse("Forbidden", 403);
 

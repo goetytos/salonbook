@@ -1,43 +1,72 @@
 import { NextRequest } from "next/server";
-import { createBooking } from "@/lib/services/booking.service";
+import {
+  BookingServiceError,
+  createBooking,
+} from "@/lib/services/booking.service";
 import { getBusinessBySlug } from "@/lib/services/business.service";
 import {
+  isPastDateTimeInNairobi,
+  normalizeKenyanPhone,
   sanitize,
-  validatePhone,
   validateDateFormat,
   validateTimeFormat,
+  validateUuid,
   errorResponse,
 } from "@/lib/validation";
+
+function isJsonObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function boundedString(
+  value: unknown,
+  minimumLength: number,
+  maximumLength: number
+): string | null {
+  if (typeof value !== "string" || value.length > maximumLength) return null;
+
+  const trimmed = value.trim();
+  if (
+    trimmed.length < minimumLength ||
+    trimmed.length > maximumLength ||
+    sanitize(trimmed) !== trimmed
+  ) {
+    return null;
+  }
+
+  return trimmed;
+}
 
 // POST /api/bookings — create a booking (public, no auth required)
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const {
-      business_slug,
-      service_id,
-      date,
-      time,
-      customer_name,
-      customer_phone,
-      staff_id,
-      notes,
-      promotion_code,
-    } = body;
-
-    // Validate all required fields
-    if (!business_slug || !service_id || !date || !time || !customer_name || !customer_phone) {
-      return errorResponse("All fields are required");
+    const body: unknown = await request.json();
+    if (!isJsonObject(body)) {
+      return errorResponse("Request body must be a JSON object");
     }
 
-    const cleanName = sanitize(customer_name);
-    const cleanPhone = sanitize(customer_phone);
+    const businessSlug = boundedString(body.business_slug, 1, 255);
+    const serviceId = boundedString(body.service_id, 36, 36);
+    const date = boundedString(body.date, 10, 10);
+    const time = boundedString(body.time, 5, 5);
+    const cleanName = boundedString(body.customer_name, 2, 120);
+    const rawPhone = boundedString(body.customer_phone, 10, 32);
 
-    if (!cleanName || cleanName.length < 2) {
-      return errorResponse("Name must be at least 2 characters");
+    if (
+      !businessSlug ||
+      !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(businessSlug) ||
+      !serviceId ||
+      !validateUuid(serviceId) ||
+      !date ||
+      !time ||
+      !cleanName ||
+      !rawPhone
+    ) {
+      return errorResponse("Invalid or missing booking fields");
     }
 
-    if (!validatePhone(cleanPhone)) {
+    const cleanPhone = normalizeKenyanPhone(rawPhone);
+    if (!cleanPhone) {
       return errorResponse("Invalid phone number. Use format: 07XXXXXXXX or +254XXXXXXXXX");
     }
 
@@ -49,42 +78,52 @@ export async function POST(request: NextRequest) {
       return errorResponse("Invalid time format. Use HH:mm");
     }
 
-    // Prevent booking in the past
-    const today = new Date().toISOString().split("T")[0];
-    if (date < today) {
-      return errorResponse("Cannot book in the past");
+    if (isPastDateTimeInNairobi(date, time)) {
+      return errorResponse("Booking time must be in the future");
+    }
+
+    let staffId: string | undefined;
+    if (body.staff_id !== undefined && body.staff_id !== null) {
+      staffId = boundedString(body.staff_id, 36, 36) || undefined;
+      if (!staffId || !validateUuid(staffId)) {
+        return errorResponse("Invalid staff identifier");
+      }
+    }
+
+    let cleanNotes: string | undefined;
+    if (body.notes !== undefined && body.notes !== null) {
+      cleanNotes = boundedString(body.notes, 0, 1000) ?? undefined;
+      if (cleanNotes === undefined) {
+        return errorResponse("Notes must be 1000 characters or fewer");
+      }
+      if (cleanNotes.length === 0) cleanNotes = undefined;
+    }
+
+    let promotionCode: string | undefined;
+    if (body.promotion_code !== undefined && body.promotion_code !== null) {
+      promotionCode = boundedString(body.promotion_code, 1, 50) || undefined;
+      if (!promotionCode) {
+        return errorResponse("Invalid promotion code");
+      }
+      promotionCode = promotionCode.toUpperCase();
     }
 
     // Resolve business from slug
-    const business = await getBusinessBySlug(business_slug);
+    const business = await getBusinessBySlug(businessSlug);
     if (!business) {
       return errorResponse("Business not found", 404);
     }
 
-    // Validate and apply promotion if provided
-    let promotionId: string | undefined;
-    if (promotion_code) {
-      const { validatePromotion, incrementUsage } = await import(
-        "@/lib/services/promotion.service"
-      );
-      const promo = await validatePromotion(business.id, promotion_code, service_id);
-      if (!promo) {
-        return errorResponse("Invalid or expired promotion code");
-      }
-      promotionId = promo.id;
-      await incrementUsage(promo.id);
-    }
-
     const booking = await createBooking(
       business.id,
-      service_id,
+      serviceId,
       cleanName,
       cleanPhone,
       date,
       time,
-      staff_id || undefined,
-      notes ? sanitize(notes) : undefined,
-      promotionId
+      staffId,
+      cleanNotes,
+      promotionCode
     );
 
     // Fire confirmation notification (non-blocking)
@@ -95,7 +134,7 @@ export async function POST(request: NextRequest) {
           business.id,
           cleanPhone,
           cleanName,
-          booking.service_name || "your service",
+          booking.service_name_snapshot || "your service",
           date,
           time
         )
@@ -104,8 +143,12 @@ export async function POST(request: NextRequest) {
 
     return Response.json(booking, { status: 201 });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to create booking";
-    const status = message.includes("no longer available") ? 409 : 500;
-    return errorResponse(message, status);
+    if (error instanceof BookingServiceError) {
+      return errorResponse(error.message, error.status);
+    }
+    if (error instanceof SyntaxError) {
+      return errorResponse("Invalid JSON body");
+    }
+    return errorResponse("Failed to create booking", 500);
   }
 }

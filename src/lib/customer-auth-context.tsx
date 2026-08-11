@@ -1,7 +1,6 @@
 "use client";
 
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
-import { api } from "@/lib/api-client";
 import type { Customer } from "@/types";
 
 interface CustomerAuthState {

@@ -5,7 +5,7 @@ import { errorResponse } from "@/lib/validation";
 
 export async function GET(request: NextRequest) {
   try {
-    requireAdminAuth(request);
+    await requireAdminAuth(request);
   } catch (res) {
     return res as Response;
   }

@@ -1,301 +1,244 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
-import SalonBackground from "@/components/ui/SalonBackground";
-import SalonHeroGraphic from "@/components/illustrations/SalonHeroGraphic";
-import { ScissorsIcon, CombIcon, BarberPoleIcon, HairDryerIcon } from "@/components/icons/SalonIcons";
+import { useRouter } from "next/navigation";
+import StudioHeroVisual from "@/components/brand/StudioHeroVisual";
+import SiteFooter from "@/components/layout/SiteFooter";
+import SiteHeader from "@/components/layout/SiteHeader";
+
+const categoryLinks = [
+  { label: "Hair salons", value: "hair-salon", detail: "Cuts, colour & care" },
+  { label: "Barbershops", value: "barbershop", detail: "Fades, trims & grooming" },
+  { label: "Braids & locks", value: "braids", detail: "Protective styles & maintenance" },
+  { label: "Nail salons", value: "nail-salon", detail: "Manicures, colour & nail care" },
+];
+
+const bookingSteps = [
+  {
+    number: "01",
+    title: "Find the right place",
+    description: "Search by name, location or service category and compare businesses in one clear view.",
+  },
+  {
+    number: "02",
+    title: "Choose the details",
+    description: "Review services, prices and customer feedback, then select a stylist, date and time.",
+  },
+  {
+    number: "03",
+    title: "Confirm without calling",
+    description: "Share your contact details, check the appointment summary and reserve your slot online.",
+  },
+];
 
 export default function LandingPage() {
   const [search, setSearch] = useState("");
   const router = useRouter();
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    router.push(`/explore${search ? `?q=${encodeURIComponent(search)}` : ""}`);
+  const handleSearch = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const params = new URLSearchParams();
+    if (search.trim()) params.set("q", search.trim());
+    const query = params.toString();
+    router.push(`/explore${query ? `?${query}` : ""}`);
   };
 
   return (
-    <div className="min-h-screen bg-white">
-      {/* Navigation */}
-      <nav className="border-b border-dark-100 glass-card sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-sm">SB</span>
-              </div>
-              <span className="text-xl font-bold text-dark-900">SalonBook</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <Link
-                href="/explore"
-                className="text-sm font-medium text-dark-600 hover:text-dark-900 transition"
-              >
-                Explore
-              </Link>
-              <Link
-                href="/customer/auth/login"
-                className="text-sm font-medium text-dark-600 hover:text-dark-900 transition"
-              >
-                Sign In
-              </Link>
-              <Link
-                href="/customer/auth/signup"
-                className="text-sm font-medium bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 hover:scale-[1.03] hover:shadow-md active:scale-[0.97] transition-all duration-200"
-              >
-                Sign Up
-              </Link>
-            </div>
-          </div>
-        </div>
-      </nav>
+    <div className="min-h-screen bg-canvas">
+      <SiteHeader />
 
-      {/* Hero Section */}
-      <section className="relative py-20 sm:py-28 bg-gradient-to-br from-primary-900 via-primary-800 to-primary-700 overflow-hidden">
-        <SalonBackground variant="hero" />
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
-            {/* Text column */}
+      <main id="main-content">
+        <section className="relative overflow-hidden border-b border-dark-200">
+          <div className="studio-grid absolute inset-0 opacity-45" aria-hidden="true" />
+          <div className="absolute -left-32 top-20 h-80 w-80 rounded-full bg-primary-100/70 blur-3xl" aria-hidden="true" />
+          <div className="relative mx-auto grid max-w-7xl items-center gap-14 px-4 pb-20 pt-16 sm:px-6 sm:pb-24 sm:pt-20 lg:grid-cols-[1.05fr_0.95fr] lg:px-8 lg:pb-28 lg:pt-24">
             <div>
-              <div className="w-16 h-1 bg-accent-400 rounded-full mb-6" />
-              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white tracking-tight leading-tight">
-                Find &amp; book
-                <br />
-                <span className="text-accent-300">the best salons near you.</span>
-              </h1>
-              <p className="mt-6 text-lg sm:text-xl text-primary-100 max-w-xl">
-                Discover top-rated salons and barber shops in Kenya. Browse services,
-                read reviews, pick your stylist, and book your appointment in seconds.
+              <p className="inline-flex items-center gap-2 rounded-full border border-primary-200 bg-surface/80 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.16em] text-primary-800">
+                <span className="h-1.5 w-1.5 rounded-full bg-primary-500" aria-hidden="true" />
+                Salon appointments, made clearer
               </p>
 
-              {/* Search Bar */}
-              <form onSubmit={handleSearch} className="mt-8 max-w-lg">
-                <div className="flex gap-2">
+              <h1 className="mt-7 max-w-3xl text-balance font-display text-5xl font-semibold leading-[0.98] tracking-[-0.045em] text-dark-900 sm:text-6xl lg:text-[4.75rem]">
+                Your next appointment is already within reach.
+              </h1>
+              <p className="mt-7 max-w-2xl text-pretty text-lg leading-8 text-dark-600 sm:text-xl">
+                Find salons and barbershops across Kenya, compare services and reviews, choose a stylist, and reserve a time that works.
+              </p>
+
+              <form onSubmit={handleSearch} className="mt-9 max-w-2xl" role="search">
+                <label htmlFor="landing-search" className="sr-only">
+                  Search by salon name or location
+                </label>
+                <div className="flex flex-col gap-3 rounded-2xl border border-dark-200 bg-surface p-2 shadow-[0_18px_50px_rgba(28,37,31,0.09)] sm:flex-row">
                   <div className="relative flex-1">
-                    <svg
-                      className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-dark-400"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    <svg className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-dark-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+                      <circle cx="11" cy="11" r="7" strokeWidth="1.8" />
+                      <path d="m16.5 16.5 4 4" strokeWidth="1.8" strokeLinecap="round" />
                     </svg>
                     <input
-                      type="text"
+                      id="landing-search"
+                      type="search"
                       value={search}
-                      onChange={(e) => setSearch(e.target.value)}
-                      placeholder="Search for a salon near you..."
-                      className="w-full pl-10 pr-4 py-3 border-0 rounded-lg text-dark-900 placeholder:text-dark-400 focus:outline-none focus:ring-2 focus:ring-accent-400 shadow-lg"
+                      onChange={(event) => setSearch(event.target.value)}
+                      placeholder="Salon name or neighbourhood"
+                      className="min-h-12 w-full rounded-xl border-0 bg-transparent py-3 pl-12 pr-4 text-base text-dark-900 placeholder:text-dark-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
                     />
                   </div>
-                  <button
-                    type="submit"
-                    className="px-6 py-3 bg-accent-500 text-white font-medium rounded-lg hover:bg-accent-600 hover:scale-[1.03] active:scale-[0.97] transition-all duration-200 shadow-lg cursor-pointer"
-                  >
-                    Search
+                  <button type="submit" className="inline-flex min-h-12 items-center justify-center rounded-xl bg-primary-900 px-6 text-sm font-bold text-white transition-colors hover:bg-primary-700">
+                    Search SalonBook
                   </button>
                 </div>
               </form>
 
-              <div className="mt-8 flex flex-col sm:flex-row gap-4">
-                <Link
-                  href="/explore"
-                  className="inline-flex items-center justify-center px-8 py-3 bg-white text-primary-700 font-semibold rounded-lg hover:bg-primary-50 hover:scale-[1.03] hover:shadow-xl active:scale-[0.97] transition-all duration-200 text-base shadow-lg"
-                >
-                  Explore Salons
-                </Link>
-                <Link
-                  href="/customer/auth/signup"
-                  className="inline-flex items-center justify-center px-8 py-3 border border-primary-400 text-white font-medium rounded-lg hover:bg-primary-700/50 hover:scale-[1.03] hover:shadow-md active:scale-[0.97] transition-all duration-200 text-base"
-                >
-                  Create Account
-                </Link>
+              <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+                <span className="font-medium text-dark-500">Start with:</span>
+                {categoryLinks.slice(0, 3).map((category) => (
+                  <Link key={category.value} href={`/explore?category=${category.value}`} className="font-semibold text-primary-700 underline-offset-4 hover:underline">
+                    {category.label}
+                  </Link>
+                ))}
               </div>
             </div>
 
-            {/* Illustration column */}
-            <div className="hidden lg:flex justify-center">
-              <SalonHeroGraphic className="w-full max-w-md drop-shadow-2xl" />
-            </div>
+            <StudioHeroVisual />
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* Features Section */}
-      <section id="features" className="relative py-20 bg-dark-50 overflow-hidden">
-        <div className="absolute inset-0 salon-pattern-bg opacity-40" />
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl font-bold text-dark-900">
-              Booking made simple
-            </h2>
-            <p className="mt-4 text-lg text-dark-500">
-              Everything you need to find the perfect salon and book in seconds.
-            </p>
-          </div>
-          <div className="grid md:grid-cols-3 gap-8">
+        <section aria-label="What you can do with SalonBook" className="border-b border-dark-200 bg-surface">
+          <div className="mx-auto grid max-w-7xl divide-y divide-dark-200 px-4 sm:px-6 md:grid-cols-3 md:divide-x md:divide-y-0 lg:px-8">
             {[
-              {
-                title: "Discover Salons",
-                desc: "Browse top-rated salons and barber shops near you. Filter by category, location, or name to find the perfect fit.",
-                color: "from-primary-500 to-primary-600",
-                borderColor: "border-t-primary-500",
-                icon: (
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                ),
-              },
-              {
-                title: "Book Instantly",
-                desc: "Pick a service, choose your stylist, select a time slot, and confirm — all from your phone. No calls needed.",
-                color: "from-accent-400 to-accent-500",
-                borderColor: "border-t-accent-400",
-                icon: (
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-                ),
-              },
-              {
-                title: "Read Reviews",
-                desc: "See what other customers are saying. Ratings and reviews help you choose the right salon with confidence.",
-                color: "from-primary-400 to-primary-600",
-                borderColor: "border-t-primary-400",
-                icon: (
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
-                  </svg>
-                ),
-              },
-              {
-                title: "Choose Your Stylist",
-                desc: "View available staff, their specialties, and pick the one you love. Book with your favourite every time.",
-                color: "from-accent-500 to-accent-600",
-                borderColor: "border-t-accent-500",
-                icon: (
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-                  </svg>
-                ),
-              },
-              {
-                title: "Get Deals",
-                desc: "Salons offer promo codes and discounts. Apply them at checkout and save on your next appointment.",
-                color: "from-primary-500 to-primary-700",
-                borderColor: "border-t-primary-500",
-                icon: (
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                  </svg>
-                ),
-              },
-              {
-                title: "Track Your Bookings",
-                desc: "View upcoming appointments, check past visits, cancel or reschedule — all from your dashboard.",
-                color: "from-accent-400 to-accent-600",
-                borderColor: "border-t-accent-400",
-                icon: (
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-                  </svg>
-                ),
-              },
-            ].map((feature) => (
-              <div
-                key={feature.title}
-                className={`bg-white rounded-xl border border-dark-200 border-t-4 ${feature.borderColor} p-6 hover:shadow-lg hover:-translate-y-1 transition-all duration-200`}
-              >
-                <div className={`w-12 h-12 bg-gradient-to-br ${feature.color} text-white rounded-xl flex items-center justify-center mb-4 shadow-md`}>
-                  {feature.icon}
+              ["01", "Compare before you choose", "See services, prices and customer reviews."],
+              ["02", "Pick the right appointment", "Choose a stylist and an available time."],
+              ["03", "Keep the details together", "Review one clear summary before confirming."],
+            ].map(([number, title, detail]) => (
+              <div key={number} className="flex gap-4 py-7 md:px-7 md:first:pl-0 md:last:pr-0">
+                <span className="font-mono text-xs font-bold text-primary-600">{number}</span>
+                <div>
+                  <h2 className="font-semibold text-dark-900">{title}</h2>
+                  <p className="mt-1 text-sm leading-6 text-dark-500">{detail}</p>
                 </div>
-                <h3 className="text-lg font-semibold text-dark-900 mb-2">{feature.title}</h3>
-                <p className="text-dark-500 text-sm leading-relaxed">{feature.desc}</p>
               </div>
             ))}
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* CTA Section */}
-      <section className="py-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="relative bg-gradient-to-br from-primary-700 via-primary-600 to-primary-800 rounded-2xl px-8 py-16 text-center overflow-hidden">
-            {/* Diagonal stripe pattern */}
-            <div
-              className="absolute inset-0 opacity-[0.06]"
-              style={{
-                backgroundImage: "repeating-linear-gradient(45deg, transparent, transparent 20px, white 20px, white 22px)",
-              }}
-            />
-            {/* Floating icons in corners */}
-            <div className="absolute top-6 left-8 text-white opacity-15">
-              <ScissorsIcon className="w-12 h-12" />
+        <section className="px-4 py-20 sm:px-6 sm:py-28 lg:px-8">
+          <div className="mx-auto max-w-7xl">
+            <div className="grid gap-12 lg:grid-cols-[0.78fr_1.22fr] lg:gap-20">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.2em] text-primary-700">How it works</p>
+                <h2 className="mt-4 text-balance font-display text-4xl font-semibold leading-tight tracking-[-0.035em] text-dark-900 sm:text-5xl">
+                  Less arranging. More certainty.
+                </h2>
+                <p className="mt-5 max-w-md leading-7 text-dark-600">
+                  SalonBook keeps the decisions that matter—service, stylist, time and price—in one straightforward booking path.
+                </p>
+                <Link href="/explore" className="mt-7 inline-flex min-h-11 items-center gap-2 rounded-lg font-bold text-primary-700 underline-offset-4 hover:underline">
+                  Browse salons
+                  <span aria-hidden="true">→</span>
+                </Link>
+              </div>
+
+              <ol className="border-t border-dark-300">
+                {bookingSteps.map((step) => (
+                  <li key={step.number} className="grid gap-3 border-b border-dark-300 py-7 sm:grid-cols-[4rem_1fr] sm:py-9">
+                    <span className="font-mono text-sm font-bold text-primary-600">{step.number}</span>
+                    <div className="grid gap-2 sm:grid-cols-[0.72fr_1fr] sm:gap-8">
+                      <h3 className="text-lg font-semibold text-dark-900">{step.title}</h3>
+                      <p className="leading-7 text-dark-600">{step.description}</p>
+                    </div>
+                  </li>
+                ))}
+              </ol>
             </div>
-            <div className="absolute bottom-6 right-8 text-white opacity-15">
-              <CombIcon className="w-12 h-12" />
-            </div>
-            <div className="absolute top-8 right-16 text-white opacity-10">
-              <BarberPoleIcon className="w-8 h-8" />
-            </div>
-            <div className="absolute bottom-8 left-16 text-white opacity-10">
-              <HairDryerIcon className="w-8 h-8" />
+          </div>
+        </section>
+
+        <section className="bg-surface px-4 py-20 sm:px-6 sm:py-24 lg:px-8">
+          <div className="mx-auto max-w-7xl">
+            <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.2em] text-primary-700">Browse by category</p>
+                <h2 className="mt-4 font-display text-4xl font-semibold tracking-[-0.035em] text-dark-900 sm:text-5xl">Start with the service you need.</h2>
+              </div>
+              <Link href="/explore" className="inline-flex min-h-11 w-fit items-center gap-2 font-bold text-primary-700 hover:underline">
+                View every salon <span aria-hidden="true">→</span>
+              </Link>
             </div>
 
-            <div className="relative">
-              <h2 className="text-3xl font-bold text-white mb-4">
-                Your next great look is a tap away
-              </h2>
-              <p className="text-primary-100 text-lg mb-8 max-w-xl mx-auto">
-                Join thousands of customers booking with the best salons and
-                barber shops across Kenya.
-              </p>
-              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {categoryLinks.map((category, index) => (
                 <Link
-                  href="/explore"
-                  className="inline-flex items-center justify-center px-8 py-3 bg-accent-500 text-white font-semibold rounded-lg hover:bg-accent-600 hover:scale-[1.03] hover:shadow-xl active:scale-[0.97] transition-all duration-200 shadow-lg"
+                  key={category.value}
+                  href={`/explore?category=${category.value}`}
+                  className={`group flex min-h-52 flex-col justify-between rounded-[1.25rem] border p-5 transition-transform hover:-translate-y-1 ${
+                    index === 0
+                      ? "border-primary-800 bg-primary-900 text-white"
+                      : "border-dark-200 bg-canvas text-dark-900 hover:border-primary-300"
+                  }`}
                 >
-                  Find a Salon
+                  <span className={`font-mono text-xs font-bold ${index === 0 ? "text-primary-300" : "text-primary-600"}`}>
+                    0{index + 1}
+                  </span>
+                  <div>
+                    <h3 className="font-display text-2xl font-semibold">{category.label}</h3>
+                    <p className={`mt-2 text-sm ${index === 0 ? "text-primary-200" : "text-dark-500"}`}>{category.detail}</p>
+                    <span className="mt-5 inline-block text-sm font-bold group-hover:underline">Browse category →</span>
+                  </div>
                 </Link>
-                <Link
-                  href="/auth/signup"
-                  className="inline-flex items-center justify-center px-8 py-3 border border-white/30 text-white font-medium rounded-lg hover:bg-white/10 hover:scale-[1.03] active:scale-[0.97] transition-all duration-200"
-                >
-                  Own a salon? List your business
-                </Link>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="px-4 py-20 sm:px-6 sm:py-28 lg:px-8">
+          <div className="mx-auto grid max-w-7xl overflow-hidden rounded-[2rem] bg-primary-900 text-white lg:grid-cols-[1fr_0.8fr]">
+            <div className="relative p-7 sm:p-12 lg:p-16">
+              <div className="studio-grain absolute inset-0 opacity-60" aria-hidden="true" />
+              <div className="relative">
+                <p className="text-xs font-bold uppercase tracking-[0.2em] text-primary-300">For salon and barbershop owners</p>
+                <h2 className="mt-5 max-w-2xl text-balance font-display text-4xl font-semibold leading-tight tracking-[-0.035em] sm:text-5xl">
+                  Put your schedule where customers can reach it.
+                </h2>
+                <p className="mt-5 max-w-xl leading-7 text-primary-100">
+                  Publish services, organise staff and working hours, accept online bookings, and keep customer history in one place.
+                </p>
+                <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+                  <Link href="/auth/signup" className="inline-flex min-h-12 items-center justify-center rounded-lg bg-white px-6 text-sm font-bold text-primary-900 hover:bg-primary-50">
+                    List your business
+                  </Link>
+                  <Link href="/auth/login" className="inline-flex min-h-12 items-center justify-center rounded-lg border border-white/20 px-6 text-sm font-bold text-white hover:bg-white/10">
+                    Business sign in
+                  </Link>
+                </div>
+              </div>
+            </div>
+
+            <div className="border-t border-white/10 bg-white/5 p-7 sm:p-10 lg:border-l lg:border-t-0">
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary-300">A working day at a glance</p>
+              <div className="mt-6 space-y-3">
+                {[
+                  ["09:00", "Haircut & finish", "Mumbi"],
+                  ["11:30", "Loc maintenance", "Kevin"],
+                  ["14:00", "Gel manicure", "Aisha"],
+                ].map(([time, service, customer]) => (
+                  <div key={time} className="flex items-center gap-4 rounded-xl border border-white/10 bg-white/5 p-4">
+                    <span className="font-mono text-sm font-bold tabular-nums text-primary-200">{time}</span>
+                    <span className="h-8 w-px bg-white/10" aria-hidden="true" />
+                    <div>
+                      <p className="text-sm font-semibold">{service}</p>
+                      <p className="mt-0.5 text-xs text-primary-300">{customer}</p>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
+      </main>
 
-      {/* Footer */}
-      <footer className="py-8">
-        {/* Gold gradient divider */}
-        <div className="h-px bg-gradient-to-r from-transparent via-accent-400 to-transparent mb-8" />
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 bg-primary-600 rounded flex items-center justify-center">
-                <span className="text-white font-bold text-xs">SB</span>
-              </div>
-              <span className="text-sm text-dark-500">SalonBook</span>
-            </div>
-            <div className="flex items-center gap-4 text-sm text-dark-400">
-              <Link href="/explore" className="hover:text-dark-600">Explore Salons</Link>
-              <Link href="/customer/auth/signup" className="hover:text-dark-600">Create Account</Link>
-              <span className="text-dark-200">|</span>
-              <Link href="/auth/login" className="hover:text-dark-600">Salon Owner Login</Link>
-              <Link href="/auth/signup" className="hover:text-dark-600">List Your Business</Link>
-            </div>
-            <p className="text-sm text-dark-400">
-              Built for salons and barber shops in Kenya.
-            </p>
-          </div>
-        </div>
-      </footer>
+      <SiteFooter />
     </div>
   );
 }

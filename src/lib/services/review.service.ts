@@ -3,15 +3,17 @@ import type { Review } from "@/types";
 
 /** Create a review (one per booking, booking must be completed) */
 export async function createReview(
-  businessId: string,
   customerId: string,
   bookingId: string,
   rating: number,
-  comment?: string,
-  staffId?: string
+  comment?: string
 ): Promise<Review> {
   // Verify booking belongs to customer and is completed
-  const booking = await queryOne<{ id: string; business_id: string; staff_id: string }>(
+  const booking = await queryOne<{
+    id: string;
+    business_id: string;
+    staff_id: string | null;
+  }>(
     `SELECT id, business_id, staff_id FROM bookings
      WHERE id = $1 AND customer_id = $2 AND status = 'Completed'`,
     [bookingId, customerId]
@@ -37,7 +39,7 @@ export async function createReview(
       booking.business_id,
       customerId,
       bookingId,
-      staffId || booking.staff_id || null,
+      booking.staff_id,
       rating,
       comment || null,
     ]
@@ -60,14 +62,18 @@ export async function getBusinessReviews(
      LEFT JOIN staff st ON r.staff_id = st.id
      LEFT JOIN bookings b ON r.booking_id = b.id
      LEFT JOIN services s ON b.service_id = s.id
-     WHERE r.business_id = $1
+     JOIN businesses business ON business.id = r.business_id
+     WHERE r.business_id = $1 AND business.status = 'active'
      ORDER BY r.created_at DESC
      LIMIT $2 OFFSET $3`,
     [businessId, limit, offset]
   );
 
   const countResult = await queryOne<{ total: number }>(
-    "SELECT COUNT(*)::int as total FROM reviews WHERE business_id = $1",
+    `SELECT COUNT(*)::int as total
+     FROM reviews review
+     JOIN businesses business ON business.id = review.business_id
+     WHERE review.business_id = $1 AND business.status = 'active'`,
     [businessId]
   );
 
@@ -81,7 +87,9 @@ export async function getBusinessRating(
   const result = await queryOne<{ avg_rating: number; review_count: number }>(
     `SELECT COALESCE(AVG(rating), 0)::numeric as avg_rating,
             COUNT(*)::int as review_count
-     FROM reviews WHERE business_id = $1`,
+     FROM reviews review
+     JOIN businesses business ON business.id = review.business_id
+     WHERE review.business_id = $1 AND business.status = 'active'`,
     [businessId]
   );
   return {

@@ -1,4 +1,5 @@
 import { query, queryOne } from "@/lib/db";
+import { getNairobiDateTime } from "@/lib/validation";
 import type { AnalyticsData } from "@/types";
 
 /** Get analytics data for a business */
@@ -7,16 +8,15 @@ export async function getAnalytics(
   period: "7d" | "30d" | "90d" = "30d"
 ): Promise<AnalyticsData> {
   const days = period === "7d" ? 7 : period === "30d" ? 30 : 90;
-  const startDate = new Date();
-  startDate.setDate(startDate.getDate() - days);
+  const today = getNairobiDateTime().date;
+  const [year, month, day] = today.split("-").map(Number);
+  const startDate = new Date(Date.UTC(year, month - 1, day - days + 1));
   const start = startDate.toISOString().split("T")[0];
-  const today = new Date().toISOString().split("T")[0];
 
   // Revenue over time
   const revenue = await query<{ date: string; amount: number }>(
-    `SELECT b.date::text as date, COALESCE(SUM(s.price), 0)::numeric as amount
+    `SELECT b.date::text as date, COALESCE(SUM(b.final_price), 0)::numeric as amount
      FROM bookings b
-     JOIN services s ON b.service_id = s.id
      WHERE b.business_id = $1 AND b.date >= $2 AND b.date <= $3
        AND b.status = 'Completed'
      GROUP BY b.date
@@ -37,12 +37,11 @@ export async function getAnalytics(
 
   // Popular services
   const popularServices = await query<{ name: string; count: number }>(
-    `SELECT s.name, COUNT(*)::int as count
+    `SELECT b.service_name_snapshot AS name, COUNT(*)::int as count
      FROM bookings b
-     JOIN services s ON b.service_id = s.id
      WHERE b.business_id = $1 AND b.date >= $2 AND b.date <= $3
        AND b.status NOT IN ('Cancelled', 'No-Show')
-     GROUP BY s.name
+     GROUP BY b.service_name_snapshot
      ORDER BY count DESC
      LIMIT 5`,
     [businessId, start, today]
@@ -66,7 +65,7 @@ export async function getAnalytics(
     new_customers: number;
   }>(
     `SELECT
-       (SELECT COALESCE(SUM(s.price), 0) FROM bookings b JOIN services s ON b.service_id = s.id
+       (SELECT COALESCE(SUM(b.final_price), 0) FROM bookings b
         WHERE b.business_id = $1 AND b.date >= $2 AND b.status = 'Completed')::numeric as total_revenue,
        (SELECT COUNT(*) FROM bookings WHERE business_id = $1 AND date >= $2
         AND status NOT IN ('Cancelled', 'No-Show'))::int as total_bookings,

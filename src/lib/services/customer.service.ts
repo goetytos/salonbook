@@ -1,6 +1,25 @@
 import { query, queryOne } from "@/lib/db";
 import { hashPassword, verifyPassword, signToken } from "@/lib/auth";
+import { normalizeKenyanPhone } from "@/lib/validation";
 import type { Customer, AuthResponse, Booking } from "@/types";
+
+export class CustomerRegistrationError extends Error {
+  readonly code = "EMAIL_ALREADY_REGISTERED";
+
+  constructor() {
+    super("Email already registered");
+    this.name = "CustomerRegistrationError";
+  }
+}
+
+function isEmailUniqueViolation(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const databaseError = error as { code?: unknown; constraint?: unknown };
+  return (
+    databaseError.code === "23505" &&
+    databaseError.constraint === "customers_email_key"
+  );
+}
 
 /** Register a new customer account */
 export async function registerCustomer(
@@ -9,21 +28,34 @@ export async function registerCustomer(
   password: string,
   phone: string
 ): Promise<AuthResponse> {
+  const normalizedPhone = normalizeKenyanPhone(phone);
+  if (!normalizedPhone) throw new Error("Invalid phone number");
+
   // Check if email already taken
   const existing = await queryOne<Customer>(
     "SELECT id FROM customers WHERE email = $1",
     [email]
   );
-  if (existing) throw new Error("Email already registered");
+  if (existing) throw new CustomerRegistrationError();
 
   const passwordHash = await hashPassword(password);
 
-  const customer = await queryOne<Customer>(
-    `INSERT INTO customers (name, email, password_hash, phone)
-     VALUES ($1, $2, $3, $4)
-     RETURNING *`,
-    [name, email, passwordHash, phone]
-  );
+  let customer: Customer | null;
+  try {
+    // Always create a distinct credentialed identity. Matching guest name/phone
+    // data is intentionally not claimed; verified OTP linking is future work.
+    customer = await queryOne<Customer>(
+      `INSERT INTO customers (name, email, password_hash, phone)
+       VALUES ($1, $2, $3, $4)
+       RETURNING *`,
+      [name, email, passwordHash, normalizedPhone]
+    );
+  } catch (error) {
+    // The pre-check improves the common response, while the unique constraint
+    // remains the authoritative race-safe boundary.
+    if (isEmailUniqueViolation(error)) throw new CustomerRegistrationError();
+    throw error;
+  }
 
   if (!customer) throw new Error("Failed to create account");
 
@@ -71,7 +103,9 @@ export async function getCustomerById(
 /** Get all bookings for a customer */
 export async function getCustomerBookings(customerId: string): Promise<Booking[]> {
   return query<Booking>(
-    `SELECT b.*, s.name as service_name, s.price as service_price,
+    `SELECT b.*,
+            COALESCE(b.service_name_snapshot, s.name) as service_name,
+            COALESCE(b.service_price_snapshot, s.price) as service_price,
             s.duration_minutes as service_duration,
             biz.name as business_name, biz.location as business_location
      FROM bookings b

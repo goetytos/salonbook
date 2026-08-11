@@ -5,7 +5,7 @@ import { errorResponse } from "@/lib/validation";
 
 export async function GET(request: NextRequest) {
   try {
-    const businessId = requireAuth(request);
+    const businessId = await requireAuth(request);
     const business = await getBusinessById(businessId);
 
     if (!business) {

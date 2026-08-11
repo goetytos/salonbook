@@ -4,16 +4,26 @@ import { sanitize, errorResponse } from "@/lib/validation";
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { email, password } = body;
+    const body: unknown = await request.json();
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      return errorResponse("Request body must be a JSON object");
+    }
+    const { email, password } = body as Record<string, unknown>;
 
-    if (!email || !password) return errorResponse("Email and password are required");
+    if (
+      typeof email !== "string" ||
+      typeof password !== "string" ||
+      email.length > 320 ||
+      password.length > 128
+    ) {
+      return errorResponse("Email and password are required");
+    }
 
     const cleanEmail = sanitize(email).toLowerCase();
     const result = await loginCustomer(cleanEmail, password);
     return Response.json(result);
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Login failed";
-    return errorResponse(message, 401);
+    if (error instanceof SyntaxError) return errorResponse("Invalid JSON body");
+    return errorResponse("Invalid email or password", 401);
   }
 }

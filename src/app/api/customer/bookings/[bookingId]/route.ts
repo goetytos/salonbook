@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { requireCustomerAuth } from "@/lib/auth";
 import { cancelCustomerBooking } from "@/lib/services/customer.service";
-import { errorResponse } from "@/lib/validation";
+import { errorResponse, validateUuid } from "@/lib/validation";
 
 // PATCH /api/customer/bookings/[bookingId] — cancel a booking
 export async function PATCH(
@@ -11,6 +11,7 @@ export async function PATCH(
   try {
     const customerId = requireCustomerAuth(request);
     const { bookingId } = await params;
+    if (!validateUuid(bookingId)) return errorResponse("Invalid booking identifier");
 
     const booking = await cancelCustomerBooking(bookingId, customerId);
     if (!booking) return errorResponse("Booking not found or already cancelled", 404);

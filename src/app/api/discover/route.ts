@@ -1,13 +1,22 @@
 import { NextRequest } from "next/server";
 import { query } from "@/lib/db";
-import { errorResponse } from "@/lib/validation";
+import { errorResponse, sanitize } from "@/lib/validation";
+
+function escapeLikePattern(value: string): string {
+  return value.replace(/[\\%_]/g, "\\$&");
+}
 
 // GET /api/discover?q=&category= — public discovery search
 export async function GET(request: NextRequest) {
   try {
     const url = new URL(request.url);
-    const q = url.searchParams.get("q") || "";
-    const category = url.searchParams.get("category") || "";
+    const rawQuery = url.searchParams.get("q") || "";
+    const rawCategory = url.searchParams.get("category") || "";
+    if (rawQuery.length > 100 || rawCategory.length > 100) {
+      return errorResponse("Search filters are too long");
+    }
+    const q = sanitize(rawQuery);
+    const category = sanitize(rawCategory);
 
     let sql = `
       SELECT b.id, b.name, b.slug, b.location, b.category,
@@ -21,8 +30,8 @@ export async function GET(request: NextRequest) {
     const params: unknown[] = [];
 
     if (q) {
-      params.push(`%${q}%`);
-      sql += ` AND (b.name ILIKE $${params.length} OR b.location ILIKE $${params.length})`;
+      params.push(`%${escapeLikePattern(q)}%`);
+      sql += ` AND (b.name ILIKE $${params.length} ESCAPE '\\' OR b.location ILIKE $${params.length} ESCAPE '\\')`;
     }
 
     if (category) {

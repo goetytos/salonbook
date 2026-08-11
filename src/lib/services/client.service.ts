@@ -21,7 +21,9 @@ export async function getClientDetail(businessId: string, customerId: string) {
   if (!customer) return null;
 
   const bookings = await query(
-    `SELECT b.*, s.name as service_name, s.price as service_price,
+    `SELECT b.*,
+            COALESCE(b.service_name_snapshot, s.name) as service_name,
+            COALESCE(b.service_price_snapshot, s.price) as service_price,
             s.duration_minutes as service_duration, st.name as staff_name
      FROM bookings b
      JOIN services s ON b.service_id = s.id
@@ -46,10 +48,9 @@ export async function getClientDetail(businessId: string, customerId: string) {
   );
 
   const statsResult = await queryOne<{ total_spent: number; total_visits: number }>(
-    `SELECT COALESCE(SUM(s.price), 0)::numeric as total_spent,
+    `SELECT COALESCE(SUM(b.final_price), 0)::numeric as total_spent,
             COUNT(*)::int as total_visits
      FROM bookings b
-     JOIN services s ON b.service_id = s.id
      WHERE b.business_id = $1 AND b.customer_id = $2 AND b.status = 'Completed'`,
     [businessId, customerId]
   );
@@ -73,22 +74,29 @@ export async function addClientNote(
 ): Promise<ClientNote> {
   const result = await queryOne<ClientNote>(
     `INSERT INTO client_notes (business_id, customer_id, note, created_by)
-     VALUES ($1, $2, $3, $4)
+     SELECT $1::uuid, $2::uuid, $3::text, $4::uuid
+     WHERE EXISTS (
+       SELECT 1 FROM bookings
+       WHERE business_id = $1 AND customer_id = $2
+     )
      RETURNING *`,
     [businessId, customerId, note, createdBy || null]
   );
-  if (!result) throw new Error("Failed to add note");
+  if (!result) throw new Error("Customer not found for this business");
   return result;
 }
 
 /** Delete a client note */
 export async function deleteClientNote(
   noteId: string,
-  businessId: string
+  businessId: string,
+  customerId: string
 ): Promise<boolean> {
   const result = await queryOne<ClientNote>(
-    "DELETE FROM client_notes WHERE id = $1 AND business_id = $2 RETURNING id",
-    [noteId, businessId]
+    `DELETE FROM client_notes
+     WHERE id = $1 AND business_id = $2 AND customer_id = $3
+     RETURNING id`,
+    [noteId, businessId, customerId]
   );
   return !!result;
 }
@@ -132,23 +140,47 @@ export async function deleteTag(
 
 /** Tag a customer */
 export async function tagCustomer(
+  businessId: string,
   customerId: string,
   tagId: string
-): Promise<void> {
-  await queryOne(
-    `INSERT INTO customer_tags (customer_id, tag_id) VALUES ($1, $2)
-     ON CONFLICT DO NOTHING`,
-    [customerId, tagId]
+): Promise<boolean> {
+  const result = await queryOne<{ customer_id: string }>(
+    `INSERT INTO customer_tags (customer_id, tag_id)
+     SELECT $2::uuid, $3::uuid
+     WHERE EXISTS (
+       SELECT 1 FROM bookings
+       WHERE business_id = $1 AND customer_id = $2
+     )
+       AND EXISTS (
+         SELECT 1 FROM client_tags
+         WHERE business_id = $1 AND id = $3
+       )
+     ON CONFLICT DO NOTHING
+     RETURNING customer_id`,
+    [businessId, customerId, tagId]
   );
+  return !!result;
 }
 
 /** Remove a tag from a customer */
 export async function untagCustomer(
+  businessId: string,
   customerId: string,
   tagId: string
-): Promise<void> {
-  await queryOne(
-    "DELETE FROM customer_tags WHERE customer_id = $1 AND tag_id = $2",
-    [customerId, tagId]
+): Promise<boolean> {
+  const result = await queryOne<{ customer_id: string }>(
+    `DELETE FROM customer_tags customer_tag
+     USING client_tags tag
+     WHERE customer_tag.customer_id = $2
+       AND customer_tag.tag_id = $3
+       AND tag.id = customer_tag.tag_id
+       AND tag.business_id = $1
+       AND EXISTS (
+         SELECT 1 FROM bookings
+         WHERE business_id = $1 AND customer_id = $2
+       )
+     RETURNING customer_tag.customer_id`,
+    [businessId, customerId, tagId]
   );
+  return !!result;
 }

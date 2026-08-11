@@ -44,7 +44,12 @@ export async function createBlockedDate(
 ): Promise<BlockedDate> {
   const result = await queryOne<BlockedDate>(
     `INSERT INTO blocked_dates (business_id, staff_id, date, start_time, end_time, reason)
-     VALUES ($1, $2, $3, $4, $5, $6)
+     SELECT $1::uuid, $2::uuid, $3::date, $4::time, $5::time, $6::text
+     WHERE $2::uuid IS NULL
+        OR EXISTS (
+          SELECT 1 FROM staff
+          WHERE id = $2 AND business_id = $1 AND active = true
+        )
      RETURNING *`,
     [
       businessId,
@@ -55,7 +60,9 @@ export async function createBlockedDate(
       data.reason || null,
     ]
   );
-  if (!result) throw new Error("Failed to create blocked date");
+  if (!result) {
+    throw new Error("Staff member is unavailable for this business");
+  }
   return result;
 }
 
