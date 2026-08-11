@@ -1,15 +1,8 @@
 import { Pool } from "pg";
+import { databaseConnectionConfig } from "@/lib/db/config";
 import { logServerError } from "@/lib/server/logging";
 
 let pool: Pool | null = null;
-
-function normalizedConnectionString(): string {
-  const value = process.env.DATABASE_URL?.replace(/\\n$/, "").trim();
-  if (!value) {
-    throw new Error("DATABASE_URL is required for database operations");
-  }
-  return value;
-}
 
 function configuredPoolSize(): number {
   const parsed = Number.parseInt(process.env.DB_POOL_MAX || "3", 10);
@@ -20,9 +13,9 @@ function configuredPoolSize(): number {
 export function getPool(): Pool {
   if (pool) return pool;
 
-  const connectionString = normalizedConnectionString();
+  const connection = databaseConnectionConfig();
   pool = new Pool({
-    connectionString,
+    ...connection,
     max: configuredPoolSize(),
     idleTimeoutMillis: 20_000,
     connectionTimeoutMillis: 10_000,
@@ -30,9 +23,6 @@ export function getPool(): Pool {
     statement_timeout: 15_000,
     allowExitOnIdle: true,
     application_name: "salonbook-web",
-    ssl: connectionString.includes("supabase.co")
-      ? { rejectUnauthorized: true }
-      : undefined,
   });
 
   pool.on("error", (error) => {

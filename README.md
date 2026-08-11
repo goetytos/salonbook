@@ -76,6 +76,7 @@ Configuration variables:
 | ------------------------ | ------------------------------------------------------ |
 | `DATABASE_URL`           | Runtime PostgreSQL connection string                   |
 | `MIGRATION_DATABASE_URL` | Recommended direct/session URL for migrations (port 5432) |
+| `SUPABASE_DB_CA_CERT`    | Supabase production CA certificate for strict TLS      |
 | `JWT_SECRET`             | Secret key for JWT signing (32+ chars)                 |
 
 ### Database Setup
@@ -90,6 +91,9 @@ For Supabase, set `MIGRATION_DATABASE_URL` to the direct connection or the
 Supavisor **Session** connection on port `5432`. Keep the port `6543`
 transaction-pooler URL in `DATABASE_URL` for serverless runtime traffic; the
 migration runner refuses it because migrations use a session advisory lock.
+Download the public CA certificate from Supabase's Database Settings → SSL
+Configuration and store its full PEM text in `SUPABASE_DB_CA_CERT`. Runtime and
+migration connections fail closed if a Supabase URL is configured without it.
 
 For production, take and verify a database backup first, then run migrations
 before deploying application code that reads the new columns. Migration 004

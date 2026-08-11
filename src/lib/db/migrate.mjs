@@ -72,10 +72,35 @@ async function migrate() {
     return;
   }
 
-  const ssl = isSupabase ? { rejectUnauthorized: true } : undefined;
+  let ssl;
+  if (isSupabase) {
+    const ca = process.env.SUPABASE_DB_CA_CERT?.replace(/\\n/g, "\n").trim();
+    if (
+      !ca ||
+      !ca.startsWith("-----BEGIN CERTIFICATE-----") ||
+      !ca.endsWith("-----END CERTIFICATE-----")
+    ) {
+      console.error(
+        "ERROR: SUPABASE_DB_CA_CERT is required for Supabase migrations."
+      );
+      process.exitCode = 1;
+      return;
+    }
+    for (const key of [
+      "ssl",
+      "sslmode",
+      "sslcert",
+      "sslkey",
+      "sslrootcert",
+      "uselibpqcompat",
+    ]) {
+      connectionUrl.searchParams.delete(key);
+    }
+    ssl = { ca, rejectUnauthorized: true };
+  }
 
   const client = new pg.Client({
-    connectionString,
+    connectionString: connectionUrl.toString(),
     ssl,
     connectionTimeoutMillis: 10_000,
     application_name: "salonbook-migrate",
