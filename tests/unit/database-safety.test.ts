@@ -33,7 +33,7 @@ describe("integration database server safety", () => {
       "postgresql://postgres:postgres@127.0.0.1:5432/salonbook_test_ci";
 
     expect(() =>
-      assertSafeConnectedDatabase("salonbook_test_ci", "172.18.0.2")
+      assertSafeConnectedDatabase("salonbook_test_ci", "::ffff:172.18.0.2")
     ).not.toThrow();
   });
 

@@ -10,7 +10,7 @@ function isLocalHost(value: string): boolean {
 }
 
 function isPrivateContainerAddress(value: string): boolean {
-  const normalized = value.toLowerCase();
+  const normalized = value.toLowerCase().replace(/^::ffff:/, "");
   if (normalized.startsWith("fc") || normalized.startsWith("fd")) return true;
 
   const octets = normalized.split(".").map(Number);
