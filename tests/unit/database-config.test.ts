@@ -5,7 +5,7 @@ const CA = "-----BEGIN CERTIFICATE-----\ntrusted-ca\n-----END CERTIFICATE-----";
 
 describe("database connection configuration", () => {
   it("requires a configured PostgreSQL URL", () => {
-    expect(() => databaseConnectionConfig(undefined, undefined)).toThrow(
+    expect(() => databaseConnectionConfig("", undefined)).toThrow(
       "DATABASE_URL is required"
     );
     expect(() => databaseConnectionConfig("https://example.com", undefined)).toThrow(
