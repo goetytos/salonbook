@@ -135,7 +135,7 @@ describe("notification outbox claim and dispatch", () => {
 
     const claimSql = client.query.mock.calls[3][0] as string;
     const claimParams = client.query.mock.calls[3][1] as unknown[];
-    expect(claimSql).toContain("FOR UPDATE SKIP LOCKED");
+    expect(claimSql).toContain("FOR UPDATE OF outbox SKIP LOCKED");
     expect(claimSql).toContain("INTERVAL '2 minutes'");
     expect(claimParams[1]).toBe(10);
     expect(result).toEqual({

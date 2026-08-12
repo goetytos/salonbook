@@ -232,7 +232,7 @@ export async function claimNotificationOutboxJobs(options?: {
            AND ($3::uuid IS NULL OR outbox.booking_id = $3::uuid)
          ORDER BY outbox.available_at, outbox.created_at, outbox.id
          LIMIT $2
-         FOR UPDATE SKIP LOCKED
+         FOR UPDATE OF outbox SKIP LOCKED
        ), claimed AS (
          UPDATE notification_outbox AS outbox
          SET status = 'processing',

@@ -325,6 +325,36 @@ describeWithDatabase("notification outbox against PostgreSQL 17", () => {
     );
   });
 
+  it("claims outbox rows without contending on a locked parent booking", async () => {
+    const fixture = await seedBookingFixture();
+    const booking = await bookAt(
+      fixture.businessId,
+      fixture.serviceId,
+      "10:00",
+      "00041"
+    );
+    const bookingLock = await pool.connect();
+
+    try {
+      await bookingLock.query("BEGIN");
+      await bookingLock.query(
+        `SELECT id FROM bookings WHERE id = $1 FOR UPDATE`,
+        [booking.id]
+      );
+
+      const claimed = await claimJobs({ batchSize: 2, bookingId: booking.id });
+
+      expect(claimed).toHaveLength(2);
+      expect(new Set(claimed.map(({ id }) => id)).size).toBe(2);
+      expect(claimed.every(({ booking_id }) => booking_id === booking.id)).toBe(
+        true
+      );
+    } finally {
+      await bookingLock.query("ROLLBACK");
+      bookingLock.release();
+    }
+  });
+
   it("recovers expired leases and dead-letters stale pending notifications", async () => {
     const fixture = await seedBookingFixture();
     const booking = await bookAt(
