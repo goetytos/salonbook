@@ -1,6 +1,34 @@
-import { query, queryOne } from "@/lib/db";
+import { query, queryOne, transaction } from "@/lib/db";
 import { hashPassword, verifyPassword, signToken } from "@/lib/auth";
-import type { Admin, PlatformStats } from "@/types";
+import {
+  assessBusinessReadiness,
+  formatReadinessBlockers,
+} from "@/lib/business-readiness";
+import type { Admin, PlatformStats, WorkingHours } from "@/types";
+
+interface BusinessReadinessRow {
+  id: string;
+  name: string;
+  slug: string;
+  email: string;
+  phone: string;
+  location: string;
+  description: string | null;
+  category: string | null;
+  working_hours: WorkingHours;
+  status: string;
+  created_at: string;
+  booking_count: number;
+  customer_count: number;
+  active_service_count: number;
+}
+
+export class BusinessActivationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "BusinessActivationError";
+  }
+}
 
 /** Create the first admin (only works when no admins exist) */
 export async function seedAdmin(
@@ -42,7 +70,7 @@ export async function loginAdmin(
   const valid = await verifyPassword(password, admin.password_hash);
   if (!valid) throw new Error("Invalid email or password");
 
-  const token = signToken({ id: admin.id, email: admin.email, role: "admin" });
+  const token = signToken({ id: admin.id, role: "admin" });
 
   const { password_hash: _, ...safe } = admin;
   return { token, admin: safe };
@@ -65,11 +93,13 @@ export async function getAdminById(
 export async function listBusinesses(statusFilter?: string) {
   let sql = `
     SELECT b.id, b.name, b.slug, b.email, b.phone, b.location,
-           b.category, b.status, b.created_at,
+           b.description, b.category, b.working_hours, b.status, b.created_at,
            COUNT(DISTINCT bk.id)::int as booking_count,
-           COUNT(DISTINCT bk.customer_id)::int as customer_count
+           COUNT(DISTINCT bk.customer_id)::int as customer_count,
+           COUNT(DISTINCT s.id) FILTER (WHERE s.active = true)::int as active_service_count
     FROM businesses b
     LEFT JOIN bookings bk ON b.id = bk.business_id
+    LEFT JOIN services s ON b.id = s.business_id
   `;
   const params: unknown[] = [];
 
@@ -80,7 +110,11 @@ export async function listBusinesses(statusFilter?: string) {
 
   sql += ` GROUP BY b.id ORDER BY b.created_at DESC`;
 
-  return query(sql, params);
+  const businesses = await query<BusinessReadinessRow>(sql, params);
+  return businesses.map((business) => ({
+    ...business,
+    readiness: assessBusinessReadiness(business),
+  }));
 }
 
 /** Update business status */
@@ -93,13 +127,50 @@ export async function updateBusinessStatus(
     throw new Error("Invalid status. Must be: pending, active, or suspended");
   }
 
-  const business = await queryOne(
-    `UPDATE businesses SET status = $1 WHERE id = $2
-     RETURNING id, name, slug, email, status`,
-    [status, businessId]
-  );
-  if (!business) throw new Error("Business not found");
-  return business;
+  return transaction(async (client) => {
+    const result = await client.query<Omit<BusinessReadinessRow, "active_service_count">>(
+      `SELECT b.id, b.name, b.slug, b.email, b.phone, b.location,
+              b.description, b.category, b.working_hours, b.status, b.created_at,
+              0::int AS booking_count, 0::int AS customer_count
+       FROM businesses b
+       WHERE b.id = $1
+       FOR UPDATE`,
+      [businessId]
+    );
+    const existing = result.rows[0];
+    if (!existing) throw new Error("Business not found");
+
+    if (status === "active") {
+      const serviceCount = await client.query<{ count: number }>(
+        `SELECT COUNT(*)::int AS count
+         FROM services
+         WHERE business_id = $1 AND active = true`,
+        [businessId]
+      );
+      const readiness = assessBusinessReadiness({
+        ...existing,
+        active_service_count: serviceCount.rows[0]?.count || 0,
+      });
+      if (!readiness.ready) {
+        throw new BusinessActivationError(
+          `Complete the public listing before activation. ${formatReadinessBlockers(readiness)}`
+        );
+      }
+    }
+
+    const updated = await client.query<{
+      id: string;
+      name: string;
+      slug: string;
+      email: string;
+      status: string;
+    }>(
+      `UPDATE businesses SET status = $1 WHERE id = $2
+       RETURNING id, name, slug, email, status`,
+      [status, businessId]
+    );
+    return updated.rows[0];
+  });
 }
 
 /** Get platform-wide statistics */

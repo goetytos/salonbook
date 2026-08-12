@@ -48,11 +48,11 @@ export default function SiteHeader() {
           </div>
 
           <div className="hidden items-center gap-3 md:flex">
-            <Link href="/customer/auth/login" className="rounded-lg px-3 py-2 text-sm font-semibold text-dark-600 hover:bg-dark-50 hover:text-dark-900">
-              Sign in
+            <Link href="/auth/login" className="rounded-lg px-3 py-2 text-sm font-semibold text-dark-600 hover:bg-dark-50 hover:text-dark-900">
+              Business sign in
             </Link>
-            <Link href="/customer/auth/signup" className="inline-flex min-h-11 items-center justify-center rounded-lg bg-primary-900 px-4 text-sm font-semibold text-white transition-colors hover:bg-primary-700">
-              Create account
+            <Link href="/explore" className="inline-flex min-h-11 items-center justify-center rounded-lg bg-primary-900 px-4 text-sm font-semibold text-white transition-colors hover:bg-primary-700">
+              Book a salon
             </Link>
           </div>
 
@@ -80,13 +80,6 @@ export default function SiteHeader() {
               <Link href="/explore" className="rounded-lg px-3 py-3 text-sm font-semibold text-dark-800 hover:bg-dark-50">
                 Find a salon
               </Link>
-              <Link href="/customer/auth/login" className="rounded-lg px-3 py-3 text-sm font-semibold text-dark-800 hover:bg-dark-50">
-                Customer sign in
-              </Link>
-              <Link href="/customer/auth/signup" className="rounded-lg px-3 py-3 text-sm font-semibold text-dark-800 hover:bg-dark-50">
-                Create customer account
-              </Link>
-              <div className="my-2 h-px bg-dark-200" />
               <Link href="/auth/signup" className="rounded-lg bg-primary-900 px-3 py-3 text-center text-sm font-semibold text-white hover:bg-primary-700">
                 List your business
               </Link>

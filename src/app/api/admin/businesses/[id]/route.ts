@@ -1,6 +1,9 @@
 import { NextRequest } from "next/server";
 import { requireAdminAuth } from "@/lib/auth";
-import { updateBusinessStatus } from "@/lib/services/admin.service";
+import {
+  BusinessActivationError,
+  updateBusinessStatus,
+} from "@/lib/services/admin.service";
 import { errorResponse, validateUuid } from "@/lib/validation";
 
 export async function PATCH(
@@ -30,12 +33,15 @@ export async function PATCH(
     return Response.json(business);
   } catch (error) {
     if (error instanceof SyntaxError) return errorResponse("Invalid JSON body");
+    if (error instanceof BusinessActivationError) {
+      return errorResponse(error.message, 409);
+    }
     const message = error instanceof Error ? error.message : "Update failed";
+    const invalidStatus = message.startsWith("Invalid status");
+    const notFound = message === "Business not found";
     return errorResponse(
-      message.startsWith("Invalid status") || message === "Business not found"
-        ? message
-        : "Update failed",
-      message === "Business not found" ? 404 : 400
+      invalidStatus || notFound ? message : "Update failed",
+      notFound ? 404 : invalidStatus ? 400 : 500
     );
   }
 }

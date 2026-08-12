@@ -1,10 +1,11 @@
 import { NextRequest } from "next/server";
+import { requireAuth } from "@/lib/auth";
 import { getPublicBusinessProfile } from "@/lib/services/business.service";
 import { errorResponse } from "@/lib/validation";
 
 // GET /api/profile/[slug] — public business profile
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ slug: string }> }
 ) {
   try {
@@ -15,10 +16,19 @@ export async function GET(
     ) {
       return errorResponse("Business not found", 404);
     }
-    const profile = await getPublicBusinessProfile(slug);
+    let previewBusinessId: string | undefined;
+    if (request.nextUrl.searchParams.get("preview") === "1") {
+      previewBusinessId = await requireAuth(request);
+    }
+
+    const profile = await getPublicBusinessProfile(slug, previewBusinessId);
     if (!profile) return errorResponse("Business not found", 404);
-    return Response.json(profile);
-  } catch {
+    return Response.json({
+      ...profile,
+      preview_mode: Boolean(previewBusinessId && profile.status !== "active"),
+    });
+  } catch (error) {
+    if (error instanceof Response) return error;
     return errorResponse("Failed to fetch business profile", 500);
   }
 }

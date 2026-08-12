@@ -1,4 +1,4 @@
-import { NextRequest } from "next/server";
+import { after, NextRequest } from "next/server";
 import {
   BookingServiceError,
   createBooking,
@@ -13,6 +13,16 @@ import {
   validateUuid,
   errorResponse,
 } from "@/lib/validation";
+import {
+  PUBLIC_BOOKING_RATE_LIMIT,
+  RateLimitUnavailableError,
+  enforceRateLimit,
+  rateLimitExceededResponse,
+  rateLimitUnavailableResponse,
+} from "@/lib/security/rate-limit";
+import { dispatchNotificationOutbox } from "@/lib/services/notification-outbox.service";
+import { logServerError } from "@/lib/server/logging";
+import { sameOriginJsonMutationGuard } from "@/lib/auth-session";
 
 function isJsonObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -39,6 +49,9 @@ function boundedString(
 
 // POST /api/bookings — create a booking (public, no auth required)
 export async function POST(request: NextRequest) {
+  const rejected = sameOriginJsonMutationGuard(request);
+  if (rejected) return rejected;
+
   try {
     const body: unknown = await request.json();
     if (!isJsonObject(body)) {
@@ -69,6 +82,11 @@ export async function POST(request: NextRequest) {
     if (!cleanPhone) {
       return errorResponse("Invalid phone number. Use format: 07XXXXXXXX or +254XXXXXXXXX");
     }
+
+    const rateLimit = await enforceRateLimit(request, PUBLIC_BOOKING_RATE_LIMIT, [
+      { kind: "phone", value: cleanPhone },
+    ]);
+    if (!rateLimit.allowed) return rateLimitExceededResponse(rateLimit);
 
     if (!validateDateFormat(date)) {
       return errorResponse("Invalid date format. Use YYYY-MM-DD");
@@ -126,23 +144,24 @@ export async function POST(request: NextRequest) {
       promotionCode
     );
 
-    // Fire confirmation notification (non-blocking)
-    import("@/lib/services/notification.service")
-      .then(({ sendBookingConfirmation }) =>
-        sendBookingConfirmation(
-          booking.id,
-          business.id,
-          cleanPhone,
-          cleanName,
-          booking.service_name_snapshot || "your service",
-          date,
-          time
-        )
-      )
-      .catch(() => {});
+    // Opportunistically dispatch only the durable intents after the response.
+    // The secured worker remains authoritative if this invocation is stopped.
+    after(async () => {
+      try {
+        await dispatchNotificationOutbox({
+          bookingId: booking.id,
+          batchSize: 2,
+        });
+      } catch (error) {
+        logServerError("api.bookings.notification_outbox", error);
+      }
+    });
 
     return Response.json(booking, { status: 201 });
   } catch (error) {
+    if (error instanceof RateLimitUnavailableError) {
+      return rateLimitUnavailableResponse();
+    }
     if (error instanceof BookingServiceError) {
       return errorResponse(error.message, error.status);
     }

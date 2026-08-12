@@ -1,12 +1,6 @@
 /**
- * Stripe Subscription Billing Module (Stub)
- *
- * Integration target: Stripe Subscriptions API
- * For SalonBook SaaS billing — charging business owners a monthly fee.
- *
- * Required env vars:
- *   STRIPE_SECRET_KEY
- *   STRIPE_WEBHOOK_SECRET
+ * Stripe billing remains intentionally unavailable until subscription plans,
+ * webhook verification, entitlement state, and recovery flows are complete.
  */
 
 export interface CreateSubscriptionRequest {
@@ -15,44 +9,44 @@ export interface CreateSubscriptionRequest {
   paymentMethodId: string;
 }
 
-export interface SubscriptionResponse {
-  success: boolean;
+export interface StripeDisabledResult {
+  success: false;
+  status: "disabled";
+  errorCode: "integration_not_configured";
+}
+
+export interface SubscriptionResponse extends StripeDisabledResult {
   subscriptionId?: string;
   clientSecret?: string;
 }
 
 export async function createSubscription(
-  request: CreateSubscriptionRequest
+  _request: CreateSubscriptionRequest
 ): Promise<SubscriptionResponse> {
-  console.log(
-    `[Stripe Stub] Would create subscription for ${request.email} with price ${request.priceId}`
-  );
-
-  // TODO: Implement Stripe integration
-  // 1. Create or retrieve Stripe customer
-  // 2. Attach payment method
-  // 3. Create subscription
-  // 4. Return client secret for confirmation
-
-  return { success: true, subscriptionId: "stub-sub-id" };
+  return {
+    success: false,
+    status: "disabled",
+    errorCode: "integration_not_configured",
+  };
 }
 
 export async function cancelSubscription(
-  subscriptionId: string
-): Promise<{ success: boolean }> {
-  console.log(`[Stripe Stub] Would cancel subscription: ${subscriptionId}`);
-  return { success: true };
+  _subscriptionId: string
+): Promise<StripeDisabledResult> {
+  return {
+    success: false,
+    status: "disabled",
+    errorCode: "integration_not_configured",
+  };
 }
 
 export async function handleWebhook(
-  payload: string,
-  signature: string
-): Promise<void> {
-  console.log(`[Stripe Stub] Would process webhook with signature: ${signature.slice(0, 20)}...`);
-
-  // TODO: Verify webhook signature and process events
-  // - invoice.payment_succeeded
-  // - customer.subscription.deleted
-  // - customer.subscription.updated
-  void payload;
+  _payload: string,
+  _signature: string
+): Promise<StripeDisabledResult> {
+  return {
+    success: false,
+    status: "disabled",
+    errorCode: "integration_not_configured",
+  };
 }

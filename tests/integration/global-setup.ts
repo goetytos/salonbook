@@ -6,6 +6,9 @@ import {
   safeTestDatabaseConnectionString,
 } from "./database-safety";
 
+const INTEGRATION_RATE_LIMIT_SECRET =
+  "salonbook-integration-rate-limit-secret-that-is-longer-than-thirty-two-bytes";
+
 export async function setup(): Promise<void> {
   const rawUrl = process.env.TEST_DATABASE_URL;
   if (!rawUrl) {
@@ -17,6 +20,10 @@ export async function setup(): Promise<void> {
 
   const connectionString = safeTestDatabaseConnectionString(rawUrl);
   const repositoryRoot = fileURLToPath(new URL("../../", import.meta.url));
+
+  // Protected routes must have their independent HMAC key before Vitest
+  // evaluates any integration test module, regardless of file order.
+  process.env.RATE_LIMIT_HMAC_SECRET = INTEGRATION_RATE_LIMIT_SECRET;
 
   const client = new pg.Client({
     connectionString,

@@ -23,6 +23,15 @@ function safeImageSource(value?: string) {
   }
 }
 
+function safeExternalLink(value: string) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" ? url.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
 export default function PublicProfilePage() {
   const params = useParams();
   const slug = params.slug as string;
@@ -42,7 +51,10 @@ export default function PublicProfilePage() {
     setNotFound(false);
     setCoverFailed(false);
     try {
-      const response = await fetch(`/api/profile/${slug}`);
+      const previewRequested = new URLSearchParams(window.location.search).get("preview") === "1";
+      const response = await fetch(`/api/profile/${slug}${previewRequested ? "?preview=1" : ""}`, {
+        credentials: "same-origin",
+      });
       if (response.status === 404) {
         setNotFound(true);
         setProfile(null);
@@ -51,6 +63,11 @@ export default function PublicProfilePage() {
       if (!response.ok) throw new Error("This studio profile could not be loaded.");
       const data = await response.json() as BusinessPublicProfile;
       setProfile(data);
+
+      if (data.preview_mode) {
+        setReviews([]);
+        return;
+      }
 
       try {
         const reviewsResponse = await fetch(`/api/businesses/${data.id}/reviews`);
@@ -111,11 +128,22 @@ export default function PublicProfilePage() {
 
   const coverSource = safeImageSource(profile.cover_image_url);
   const avatarSource = safeImageSource(profile.avatar_url) || undefined;
+  const socialLinks = Object.entries(profile.social_links || {}).flatMap(
+    ([network, value]) => {
+      const url = safeExternalLink(value);
+      return url ? [{ network, url }] : [];
+    }
+  );
 
   return (
     <div className="min-h-dvh bg-canvas">
       <SiteHeader />
       <main id="main-content">
+        {profile.preview_mode && (
+          <div className="border-b border-amber-200 bg-amber-50 px-4 py-3 text-center text-sm text-amber-900" role="status">
+            <strong>Private owner preview.</strong> Customers cannot see or book this listing until setup is complete and an administrator activates it.
+          </div>
+        )}
         <section className="relative isolate h-64 overflow-hidden bg-primary-900 sm:h-80" aria-label={`${profile.name} cover`}>
           {coverSource && !coverFailed && (
             <Image
@@ -151,7 +179,11 @@ export default function PublicProfilePage() {
                   <span className="text-sm text-dark-500">{Number(profile.avg_rating).toFixed(1)} · {profile.review_count} review{profile.review_count === 1 ? "" : "s"}</span>
                 </div>
               </div>
-              <Link href={`/book/${slug}`} className="inline-flex min-h-12 w-full items-center justify-center rounded-lg bg-primary-900 px-6 text-sm font-bold text-white shadow-[0_10px_24px_rgba(16,43,36,0.18)] hover:bg-primary-700 sm:col-span-2 lg:col-span-1 lg:w-auto">Book an appointment</Link>
+              {profile.preview_mode ? (
+                <Link href="/dashboard/settings" className="inline-flex min-h-12 w-full items-center justify-center rounded-lg border border-primary-300 bg-primary-50 px-6 text-sm font-bold text-primary-800 hover:bg-primary-100 sm:col-span-2 lg:col-span-1 lg:w-auto">Return to setup</Link>
+              ) : (
+                <Link href={`/book/${slug}`} className="inline-flex min-h-12 w-full items-center justify-center rounded-lg bg-primary-900 px-6 text-sm font-bold text-white shadow-[0_10px_24px_rgba(16,43,36,0.18)] hover:bg-primary-700 sm:col-span-2 lg:col-span-1 lg:w-auto">Book an appointment</Link>
+              )}
             </div>
           </section>
         </div>
@@ -185,7 +217,7 @@ export default function PublicProfilePage() {
                             <p className="shrink-0 font-bold tabular-nums text-primary-700">KES {Number(service.price).toLocaleString()}</p>
                           </div>
                           {service.description && <p className="mt-3 flex-1 text-sm leading-6 text-dark-600">{service.description}</p>}
-                          <Link href={`/book/${slug}`} className="mt-5 inline-flex min-h-11 w-fit items-center rounded-lg text-sm font-bold text-primary-700 hover:underline">Book this service <span aria-hidden="true">→</span></Link>
+                          {!profile.preview_mode && <Link href={`/book/${slug}`} className="mt-5 inline-flex min-h-11 w-fit items-center rounded-lg text-sm font-bold text-primary-700 hover:underline">Book this service <span aria-hidden="true">→</span></Link>}
                         </article>
                       ))}
                     </div>
@@ -224,7 +256,25 @@ export default function PublicProfilePage() {
                       <h3 className="font-semibold text-primary-900">Contact and location</h3>
                       <a href={`tel:${profile.phone}`} className="mt-3 block min-h-11 text-sm font-bold text-primary-700 hover:underline">{profile.phone}</a>
                       <p className="text-sm text-primary-800">{profile.location}</p>
+                      <a
+                        href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(profile.location)}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-2 inline-flex min-h-11 items-center text-sm font-bold text-primary-700 hover:underline"
+                      >
+                        Get directions <span aria-hidden="true">↗</span>
+                      </a>
                     </div>
+
+                    {socialLinks.length > 0 && (
+                      <div className="mt-5 flex flex-wrap gap-2" aria-label={`${profile.name} links`}>
+                        {socialLinks.map(({ network, url }) => (
+                          <a key={network} href={url} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center rounded-lg border border-dark-200 px-3 text-sm font-bold capitalize text-primary-700 hover:bg-primary-50">
+                            {network} <span aria-hidden="true">↗</span>
+                          </a>
+                        ))}
+                      </div>
+                    )}
 
                     {profile.staff.length > 0 && (
                       <div className="mt-7">

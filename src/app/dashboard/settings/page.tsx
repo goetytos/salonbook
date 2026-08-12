@@ -1,8 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api-client";
+import { assessBusinessReadiness } from "@/lib/business-readiness";
 import Button from "@/components/ui/Button";
 import Card, { CardContent, CardHeader } from "@/components/ui/Card";
 import Input from "@/components/ui/Input";
@@ -10,7 +12,7 @@ import Select from "@/components/ui/Select";
 import Textarea from "@/components/ui/Textarea";
 import DashboardState from "@/components/dashboard/DashboardState";
 import PageHeader from "@/components/dashboard/PageHeader";
-import type { DaySchedule, WorkingHours } from "@/types";
+import type { DaySchedule, Service, WorkingHours } from "@/types";
 
 const DAYS: (keyof WorkingHours)[] = [
   "monday",
@@ -54,12 +56,20 @@ export default function SettingsPage() {
   const [hoursMessage, setHoursMessage] = useState("");
   const [bookingUrl, setBookingUrl] = useState("");
   const [copyMessage, setCopyMessage] = useState("");
+  const [businessName, setBusinessName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [location, setLocation] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("");
   const [coverImageUrl, setCoverImageUrl] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
   const [bufferMinutes, setBufferMinutes] = useState(0);
   const [cancellationHours, setCancellationHours] = useState(24);
+  const [instagram, setInstagram] = useState("");
+  const [facebook, setFacebook] = useState("");
+  const [tiktok, setTiktok] = useState("");
+  const [website, setWebsite] = useState("");
+  const [activeServiceCount, setActiveServiceCount] = useState(0);
   const [savingProfile, setSavingProfile] = useState(false);
   const [profileMessage, setProfileMessage] = useState("");
 
@@ -83,13 +93,29 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (!business) return;
+    setBusinessName(business.name || "");
+    setPhone(business.phone || "");
+    setLocation(business.location || "");
     setDescription(business.description || "");
     setCategory(business.category || "");
     setCoverImageUrl(business.cover_image_url || "");
     setAvatarUrl(business.avatar_url || "");
     setBufferMinutes(business.buffer_minutes || 0);
     setCancellationHours(business.cancellation_hours || 24);
+    setInstagram(business.social_links?.instagram || "");
+    setFacebook(business.social_links?.facebook || "");
+    setTiktok(business.social_links?.tiktok || "");
+    setWebsite(business.social_links?.website || "");
     setBookingUrl(`${window.location.origin}/book/${business.slug}`);
+  }, [business]);
+
+  useEffect(() => {
+    if (!business) return;
+    api.get<Service[]>(`/businesses/${business.id}/services`)
+      .then((services) => {
+        setActiveServiceCount(services.filter((service) => service.active !== false).length);
+      })
+      .catch(() => setActiveServiceCount(0));
   }, [business]);
 
   const updateDay = (day: keyof WorkingHours, field: keyof DaySchedule, value: string | boolean) => {
@@ -118,12 +144,20 @@ export default function SettingsPage() {
     setProfileMessage("");
     try {
       await api.put(`/businesses/${business.id}/profile`, {
+        name: businessName,
+        phone,
+        location,
         description,
         category,
         cover_image_url: coverImageUrl,
         avatar_url: avatarUrl,
         buffer_minutes: bufferMinutes,
         cancellation_hours: cancellationHours,
+        social_links: Object.fromEntries(
+          Object.entries({ instagram, facebook, tiktok, website }).filter(
+            ([, value]) => value.trim().length > 0
+          )
+        ),
       });
       setProfileMessage("Profile updated successfully.");
       await refresh();
@@ -150,6 +184,16 @@ export default function SettingsPage() {
   if (!hours) return <DashboardState type="loading" title="Loading business settings" />;
 
   const bookingPath = business ? `/book/${business.slug}` : "";
+  const readiness = assessBusinessReadiness({
+    ...(business || {}),
+    name: businessName,
+    phone,
+    location,
+    description,
+    category,
+    working_hours: hours,
+    active_service_count: activeServiceCount,
+  });
 
   return (
     <div>
@@ -162,6 +206,31 @@ export default function SettingsPage() {
       <div className="grid gap-6 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] xl:items-start">
         <div className="space-y-6">
           {business && (
+            <Card className={readiness.ready ? "border-green-200 bg-green-50/55" : "border-amber-200 bg-amber-50/55"}>
+              <CardHeader>
+                <p className={`text-[0.68rem] font-bold uppercase tracking-[0.15em] ${readiness.ready ? "text-green-700" : "text-amber-800"}`}>Listing readiness</p>
+                <h2 className="mt-2 font-display text-2xl font-semibold text-dark-900">
+                  {readiness.ready ? "Ready for administrator review" : `${readiness.completed} of ${readiness.total} essentials complete`}
+                </h2>
+                <p className="mt-2 text-sm leading-6 text-dark-600">Only complete listings can be activated and shown to customers.</p>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-3">
+                  {readiness.checks.map((check) => (
+                    <li key={check.key} className="flex items-start gap-3 text-sm">
+                      <span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-bold ${check.complete ? "bg-green-700 text-white" : "border border-amber-400 bg-white text-amber-800"}`} aria-hidden="true">{check.complete ? "✓" : "!"}</span>
+                      <span><strong className="text-dark-900">{check.label}</strong>{!check.complete && <span className="mt-0.5 block text-xs leading-5 text-dark-600">{check.action}</span>}</span>
+                    </li>
+                  ))}
+                </ul>
+                {!readiness.checks.find((check) => check.key === "services")?.complete && (
+                  <Link href="/dashboard/services" className="mt-5 inline-flex min-h-11 items-center text-sm font-bold text-primary-700 hover:underline">Add a service <span aria-hidden="true">→</span></Link>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {business && (
             <Card className="overflow-hidden border-primary-300 bg-primary-900 text-white">
               <CardContent>
                 <p className="text-[0.68rem] font-bold uppercase tracking-[0.15em] text-primary-200">Customer-facing link</p>
@@ -173,12 +242,12 @@ export default function SettingsPage() {
                 <div className="mt-4 flex flex-col gap-2 sm:flex-row">
                   <Button size="sm" variant="secondary" onClick={() => void handleCopy()}>Copy link</Button>
                   <a
-                    href={bookingPath}
+                    href={business.status === "active" ? bookingPath : `/profile/${business.slug}?preview=1`}
                     target="_blank"
                     rel="noreferrer"
                     className="inline-flex min-h-11 items-center justify-center rounded-lg px-3 text-sm font-bold text-primary-100 hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
                   >
-                    Preview booking page <span aria-hidden="true">↗</span>
+                    {business.status === "active" ? "Preview booking page" : "Private profile preview"} <span aria-hidden="true">↗</span>
                   </a>
                 </div>
                 <p className="mt-3 min-h-5 text-xs text-primary-100" aria-live="polite">{copyMessage}</p>
@@ -196,6 +265,11 @@ export default function SettingsPage() {
                 <Notice success={profileMessage.includes("successfully")} message={profileMessage} />
               )}
               <div className="space-y-4">
+                <Input label="Business name" autoComplete="organization" value={businessName} onChange={(event) => setBusinessName(event.target.value)} required />
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Input label="Phone number" type="tel" inputMode="tel" autoComplete="tel" value={phone} onChange={(event) => setPhone(event.target.value)} required />
+                  <Input label="Customer-facing location" autoComplete="street-address" value={location} onChange={(event) => setLocation(event.target.value)} placeholder="Westlands, Nairobi" required />
+                </div>
                 <Textarea
                   label="Description"
                   value={description}
@@ -206,6 +280,15 @@ export default function SettingsPage() {
                 <Select label="Category" value={category} onChange={(event) => setCategory(event.target.value)} options={CATEGORIES} />
                 <Input label="Cover image URL" type="url" value={coverImageUrl} onChange={(event) => setCoverImageUrl(event.target.value)} placeholder="https://example.com/cover.jpg" />
                 <Input label="Avatar URL" type="url" value={avatarUrl} onChange={(event) => setAvatarUrl(event.target.value)} placeholder="https://example.com/avatar.jpg" />
+                <fieldset className="rounded-2xl border border-dark-200 p-4">
+                  <legend className="px-1 text-sm font-semibold text-dark-800">Social and website links (optional)</legend>
+                  <div className="mt-2 grid gap-4 sm:grid-cols-2">
+                    <Input label="Instagram URL" type="url" value={instagram} onChange={(event) => setInstagram(event.target.value)} placeholder="https://instagram.com/…" />
+                    <Input label="Facebook URL" type="url" value={facebook} onChange={(event) => setFacebook(event.target.value)} placeholder="https://facebook.com/…" />
+                    <Input label="TikTok URL" type="url" value={tiktok} onChange={(event) => setTiktok(event.target.value)} placeholder="https://tiktok.com/@…" />
+                    <Input label="Website URL" type="url" value={website} onChange={(event) => setWebsite(event.target.value)} placeholder="https://example.com" />
+                  </div>
+                </fieldset>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <Input
                     label="Buffer minutes"

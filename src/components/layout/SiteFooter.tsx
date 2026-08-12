@@ -16,8 +16,7 @@ export default function SiteFooter() {
           <h2 className="text-xs font-bold uppercase tracking-[0.18em] text-primary-300">For customers</h2>
           <div className="mt-4 grid gap-3 text-sm text-primary-100">
             <Link href="/explore" className="w-fit hover:text-white">Find a salon</Link>
-            <Link href="/customer/auth/signup" className="w-fit hover:text-white">Create an account</Link>
-            <Link href="/customer/auth/login" className="w-fit hover:text-white">Manage bookings</Link>
+            <Link href="/privacy" className="w-fit hover:text-white">How booking data is used</Link>
           </div>
         </div>
 
@@ -32,7 +31,11 @@ export default function SiteFooter() {
       <div className="border-t border-white/10">
         <div className="mx-auto flex max-w-7xl flex-col gap-2 px-4 py-5 text-xs text-primary-300 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
           <p>© {new Date().getFullYear()} SalonBook.</p>
-          <p>Built for appointment businesses across Kenya.</p>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <Link href="/privacy" className="hover:text-white">Privacy</Link>
+            <Link href="/terms" className="hover:text-white">Terms</Link>
+            <p>Built for appointment businesses across Kenya.</p>
+          </div>
         </div>
       </div>
     </footer>

@@ -8,13 +8,11 @@ interface CustomerAuthState {
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   signup: (data: { name: string; email: string; password: string; phone: string }) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   refresh: () => Promise<void>;
 }
 
 const CustomerAuthContext = createContext<CustomerAuthState | null>(null);
-
-const TOKEN_KEY = "salonbook_customer_token";
 
 export function CustomerAuthProvider({ children }: { children: ReactNode }) {
   const [customer, setCustomer] = useState<Omit<Customer, "password_hash"> | null>(null);
@@ -28,40 +26,34 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
       setCustomer(data.customer);
     } catch {
       setCustomer(null);
-      localStorage.removeItem(TOKEN_KEY);
     }
   }, []);
 
   useEffect(() => {
-    const token = localStorage.getItem(TOKEN_KEY);
-    if (token) {
-      refresh().finally(() => setLoading(false));
-    } else {
-      setLoading(false);
-    }
+    localStorage.removeItem("salonbook_customer_token");
+    refresh().finally(() => setLoading(false));
   }, [refresh]);
 
   const login = async (email: string, password: string) => {
     const data = await customerApi.post<{
-      token: string;
       customer: Omit<Customer, "password_hash">;
     }>("/customer/auth/login", { email, password });
-    localStorage.setItem(TOKEN_KEY, data.token);
     setCustomer(data.customer);
   };
 
   const signup = async (formData: { name: string; email: string; password: string; phone: string }) => {
     const data = await customerApi.post<{
-      token: string;
       customer: Omit<Customer, "password_hash">;
     }>("/customer/auth/signup", formData);
-    localStorage.setItem(TOKEN_KEY, data.token);
     setCustomer(data.customer);
   };
 
-  const logout = () => {
-    localStorage.removeItem(TOKEN_KEY);
-    setCustomer(null);
+  const logout = async () => {
+    try {
+      await customerApi.post<{ success: boolean }>("/customer/auth/logout", {});
+    } finally {
+      setCustomer(null);
+    }
   };
 
   return (
@@ -77,14 +69,12 @@ export function useCustomerAuth() {
   return ctx;
 }
 
-// Separate API client that uses the customer token
+// Customer API calls use the role-specific HttpOnly cookie.
 const customerApi = {
   get: async <T,>(path: string): Promise<T> => {
-    const token = typeof window !== "undefined" ? localStorage.getItem(TOKEN_KEY) : null;
     const headers: Record<string, string> = { "Content-Type": "application/json" };
-    if (token) headers["Authorization"] = `Bearer ${token}`;
 
-    const res = await fetch(`/api${path}`, { headers });
+    const res = await fetch(`/api${path}`, { headers, credentials: "same-origin" });
     if (!res.ok) {
       const body = await res.json().catch(() => ({ error: "Request failed" }));
       throw new Error(body.error || `HTTP ${res.status}`);
@@ -92,14 +82,13 @@ const customerApi = {
     return res.json();
   },
   post: async <T,>(path: string, data: unknown): Promise<T> => {
-    const token = typeof window !== "undefined" ? localStorage.getItem(TOKEN_KEY) : null;
     const headers: Record<string, string> = { "Content-Type": "application/json" };
-    if (token) headers["Authorization"] = `Bearer ${token}`;
 
     const res = await fetch(`/api${path}`, {
       method: "POST",
       headers,
       body: JSON.stringify(data),
+      credentials: "same-origin",
     });
     if (!res.ok) {
       const body = await res.json().catch(() => ({ error: "Request failed" }));
@@ -108,14 +97,13 @@ const customerApi = {
     return res.json();
   },
   patch: async <T,>(path: string, data: unknown): Promise<T> => {
-    const token = typeof window !== "undefined" ? localStorage.getItem(TOKEN_KEY) : null;
     const headers: Record<string, string> = { "Content-Type": "application/json" };
-    if (token) headers["Authorization"] = `Bearer ${token}`;
 
     const res = await fetch(`/api${path}`, {
       method: "PATCH",
       headers,
       body: JSON.stringify(data),
+      credentials: "same-origin",
     });
     if (!res.ok) {
       const body = await res.json().catch(() => ({ error: "Request failed" }));

@@ -1,7 +1,4 @@
-/**
- * Typed fetch wrapper for API calls from the browser.
- * Automatically attaches the JWT token from localStorage.
- */
+/** Typed same-origin fetch wrapper for cookie-authenticated API calls. */
 
 const API_BASE = "/api";
 
@@ -9,21 +6,15 @@ async function request<T>(
   path: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const token =
-    typeof window !== "undefined" ? localStorage.getItem("salonbook_token") : null;
-
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     ...(options.headers as Record<string, string>),
   };
 
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
-  }
-
   const res = await fetch(`${API_BASE}${path}`, {
     ...options,
     headers,
+    credentials: "same-origin",
   });
 
   if (!res.ok) {

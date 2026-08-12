@@ -225,7 +225,10 @@ describeWithDatabase("guest and credentialed customer identity", () => {
     const signupResponse = await signup(
       new NextRequest("https://salonbook.test/api/customer/auth/signup", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: {
+          "content-type": "application/json",
+          origin: "https://salonbook.test",
+        },
         body: JSON.stringify({
           name,
           email: "njeri@identity.integration.test",
@@ -291,7 +294,10 @@ describeWithDatabase("guest and credentialed customer identity", () => {
     const duplicateResponse = await signup(
       new NextRequest("https://salonbook.test/api/customer/auth/signup", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: {
+          "content-type": "application/json",
+          origin: "https://salonbook.test",
+        },
         body: JSON.stringify({
           name: "Different Display Name",
           email: "njeri@identity.integration.test",

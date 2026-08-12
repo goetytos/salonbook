@@ -12,6 +12,7 @@ import Select from "@/components/ui/Select";
 import DashboardState from "@/components/dashboard/DashboardState";
 import PageHeader from "@/components/dashboard/PageHeader";
 import type { BlockedDate, Staff } from "@/types";
+import { getNairobiDateTime } from "@/lib/validation";
 
 export default function BlockedDatesPage() {
   const { business } = useAuth();
@@ -96,7 +97,7 @@ export default function BlockedDatesPage() {
     }
   };
 
-  const today = new Date().toISOString().split("T")[0];
+  const today = getNairobiDateTime().date;
   const formatDate = (value: string) => new Date(`${value.split("T")[0]}T00:00:00`).toLocaleDateString("en-KE", {
     weekday: "long",
     month: "long",

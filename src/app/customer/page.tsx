@@ -15,6 +15,7 @@ import Modal from "@/components/ui/Modal";
 import StarRating from "@/components/ui/StarRating";
 import Textarea from "@/components/ui/Textarea";
 import type { Booking } from "@/types";
+import { getNairobiDateTime } from "@/lib/validation";
 
 interface DiscoverBusiness {
   id: string;
@@ -142,7 +143,7 @@ export default function CustomerDashboard() {
     );
   }
 
-  const today = new Date().toISOString().split("T")[0];
+  const today = getNairobiDateTime().date;
   const upcoming = bookings.filter((booking) => booking.status === "Booked" && booking.date >= today);
   const past = bookings.filter((booking) => booking.status !== "Booked" || booking.date < today);
   const completedCount = bookings.filter((booking) => booking.status === "Completed").length;
@@ -155,8 +156,8 @@ export default function CustomerDashboard() {
     year: includeYear ? "numeric" : undefined,
   });
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     router.push("/customer/auth/login");
   };
 
@@ -168,8 +169,8 @@ export default function CustomerDashboard() {
           <div className="flex min-w-0 items-center gap-2">
             <span className="hidden max-w-48 truncate text-sm text-dark-500 md:block">Hello, {customer.name}</span>
             <Link href="/explore" className="inline-flex min-h-11 items-center justify-center rounded-lg bg-primary-900 px-3 text-sm font-bold text-white hover:bg-primary-700">Explore studios</Link>
-            <Button size="sm" variant="ghost" onClick={handleLogout} className="hidden sm:inline-flex">Sign out</Button>
-            <button type="button" aria-label="Sign out" onClick={handleLogout} className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-dark-600 hover:bg-dark-50 sm:hidden">
+            <Button size="sm" variant="ghost" onClick={() => void handleLogout()} className="hidden sm:inline-flex">Sign out</Button>
+            <button type="button" aria-label="Sign out" onClick={() => void handleLogout()} className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-dark-600 hover:bg-dark-50 sm:hidden">
               <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><path d="M10 5H6a2 2 0 00-2 2v10a2 2 0 002 2h4m5-4 3-3-3-3m3 3H9" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
             </button>
           </div>
@@ -181,7 +182,7 @@ export default function CustomerDashboard() {
           <div>
             <p className="text-[0.68rem] font-bold uppercase tracking-[0.18em] text-accent-300">My SalonBook</p>
             <h1 className="mt-3 text-balance font-display text-3xl font-semibold tracking-[-0.04em] sm:text-4xl">Your next visit starts here, {customer.name.split(" ")[0]}.</h1>
-            <p className="mt-3 max-w-xl text-sm leading-6 text-primary-100">Keep track of appointments and return to studios that feel right for you.</p>
+            <p className="mt-3 max-w-xl text-sm leading-6 text-primary-100">Keep track of appointments booked from this signed-in account. Guest bookings remain separate until secure phone verification is available.</p>
           </div>
           <Link href="/explore" className="inline-flex min-h-11 w-fit items-center justify-center rounded-lg bg-white px-4 text-sm font-bold text-primary-900 hover:bg-primary-50">Find a studio</Link>
         </header>
@@ -232,7 +233,7 @@ export default function CustomerDashboard() {
           ) : bookingsError ? (
             <DashboardState type="error" title="Bookings unavailable" description={bookingsError} onRetry={() => void fetchBookings()} />
           ) : bookings.length === 0 ? (
-            <Card><CardContent className="p-2 sm:p-2"><EmptyState title="No bookings yet" description="Browse studios, choose a service and your appointment will appear here." actionLabel="Explore studios" onAction={() => router.push("/explore")} /></CardContent></Card>
+            <Card><CardContent className="p-2 sm:p-2"><EmptyState title="No account bookings yet" description="Bookings made as a guest are not automatically linked by name or phone. Contact the studio for changes to a guest booking." actionLabel="Explore studios" onAction={() => router.push("/explore")} /></CardContent></Card>
           ) : (
             <div className="space-y-8">
               {upcoming.length > 0 && (

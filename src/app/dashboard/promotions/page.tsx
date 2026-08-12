@@ -13,6 +13,7 @@ import Select from "@/components/ui/Select";
 import DashboardState from "@/components/dashboard/DashboardState";
 import PageHeader from "@/components/dashboard/PageHeader";
 import type { Promotion } from "@/types";
+import { getNairobiDateTime } from "@/lib/validation";
 
 export default function PromotionsPage() {
   const { business } = useAuth();
@@ -111,7 +112,7 @@ export default function PromotionsPage() {
     }
   };
 
-  const today = new Date().toISOString().split("T")[0];
+  const today = getNairobiDateTime().date;
   const formatDate = (value: string) => new Date(`${value}T00:00:00`).toLocaleDateString("en-KE", {
     month: "short",
     day: "numeric",

@@ -1,7 +1,9 @@
 import { queryOne } from "@/lib/db";
+import { sendSms, type SmsSendResult } from "@/lib/modules/sms";
+import { normalizeKenyanPhone } from "@/lib/validation";
 import type { NotificationLog } from "@/types";
 
-/** Log a notification event */
+/** Log a notification event. Recipient is retained by the existing audit schema. */
 export async function logNotification(data: {
   type: string;
   recipient: string;
@@ -31,7 +33,44 @@ export async function logNotification(data: {
   return result;
 }
 
-/** Send booking confirmation (stub — logs the event) */
+function auditRecipient(phone: string): string {
+  return normalizeKenyanPhone(phone) ?? "invalid-recipient";
+}
+
+function auditPayload(result: SmsSendResult): Record<string, unknown> {
+  return {
+    provider: result.provider,
+    ...(result.messageId ? { provider_message_id: result.messageId } : {}),
+  };
+}
+
+async function sendAndLogBookingSms(data: {
+  type:
+    | "booking_confirmation"
+    | "booking_cancellation"
+    | "booking_owner_alert";
+  bookingId: string;
+  businessId: string;
+  customerPhone: string;
+  message: string;
+}): Promise<SmsSendResult> {
+  const result = await sendSms({ to: data.customerPhone, message: data.message });
+
+  await logNotification({
+    type: data.type,
+    recipient: auditRecipient(data.customerPhone),
+    channel: "sms",
+    status: result.status,
+    booking_id: data.bookingId,
+    business_id: data.businessId,
+    payload: auditPayload(result),
+    error_msg: result.errorCode,
+  });
+
+  return result;
+}
+
+/** Submit and audit a booking confirmation without claiming handset delivery. */
 export async function sendBookingConfirmation(
   bookingId: string,
   businessId: string,
@@ -40,24 +79,19 @@ export async function sendBookingConfirmation(
   serviceName: string,
   date: string,
   time: string
-): Promise<void> {
+): Promise<SmsSendResult> {
   const message = `Hi ${customerName}, your booking for ${serviceName} on ${date} at ${time} is confirmed!`;
 
-  // Stub: log to console and notification_logs
-  console.log(`[SMS Stub] To: ${customerPhone} — ${message}`);
-
-  await logNotification({
+  return sendAndLogBookingSms({
     type: "booking_confirmation",
-    recipient: customerPhone,
-    channel: "sms",
-    status: "stub_sent",
-    booking_id: bookingId,
-    business_id: businessId,
-    payload: { message, customer_name: customerName, service: serviceName, date, time },
+    bookingId,
+    businessId,
+    customerPhone,
+    message,
   });
 }
 
-/** Send booking cancellation notification (stub) */
+/** Submit and audit a booking cancellation without claiming handset delivery. */
 export async function sendBookingCancellation(
   bookingId: string,
   businessId: string,
@@ -66,18 +100,35 @@ export async function sendBookingCancellation(
   serviceName: string,
   date: string,
   time: string
-): Promise<void> {
+): Promise<SmsSendResult> {
   const message = `Hi ${customerName}, your booking for ${serviceName} on ${date} at ${time} has been cancelled.`;
 
-  console.log(`[SMS Stub] To: ${customerPhone} — ${message}`);
-
-  await logNotification({
+  return sendAndLogBookingSms({
     type: "booking_cancellation",
-    recipient: customerPhone,
-    channel: "sms",
-    status: "stub_sent",
-    booking_id: bookingId,
-    business_id: businessId,
-    payload: { message, customer_name: customerName, service: serviceName, date, time },
+    bookingId,
+    businessId,
+    customerPhone,
+    message,
+  });
+}
+
+/** Submit and audit a new-booking alert to the business owner. */
+export async function sendBookingOwnerAlert(
+  bookingId: string,
+  businessId: string,
+  ownerPhone: string,
+  customerName: string,
+  serviceName: string,
+  date: string,
+  time: string
+): Promise<SmsSendResult> {
+  const message = `New SalonBook booking: ${customerName}, ${serviceName}, ${date} at ${time}.`;
+
+  return sendAndLogBookingSms({
+    type: "booking_owner_alert",
+    bookingId,
+    businessId,
+    customerPhone: ownerPhone,
+    message,
   });
 }

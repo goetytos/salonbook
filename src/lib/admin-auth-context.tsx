@@ -4,27 +4,26 @@ import { createContext, useContext, useState, useEffect, useCallback, ReactNode 
 import type { Admin, PlatformStats } from "@/types";
 
 const API_BASE = "/api/admin";
-const TOKEN_KEY = "salonbook_admin_token";
 
 interface AdminAuthState {
   admin: Omit<Admin, "password_hash"> | null;
   stats: PlatformStats | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   refreshStats: () => Promise<void>;
 }
 
 async function adminFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const token = typeof window !== "undefined" ? localStorage.getItem(TOKEN_KEY) : null;
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     ...(options.headers as Record<string, string>),
   };
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
-  }
-  const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
+  const res = await fetch(`${API_BASE}${path}`, {
+    ...options,
+    headers,
+    credentials: "same-origin",
+  });
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: "Request failed" }));
     throw new Error(body.error || `HTTP ${res.status}`);
@@ -48,38 +47,39 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // On mount, check if token exists and validate by fetching stats
   useEffect(() => {
-    const token = localStorage.getItem(TOKEN_KEY);
-    if (token) {
-      // Decode the JWT payload to get admin info (no verification, just display)
-      try {
-        const payload = JSON.parse(atob(token.split(".")[1]));
-        setAdmin({ id: payload.id, email: payload.email, name: payload.email, created_at: "" });
-        refreshStats().finally(() => setLoading(false));
-      } catch {
-        localStorage.removeItem(TOKEN_KEY);
-        setLoading(false);
-      }
-    } else {
-      setLoading(false);
-    }
+    localStorage.removeItem("salonbook_admin_token");
+    adminFetch<{ admin: Omit<Admin, "password_hash"> }>("/auth/me")
+      .then(({ admin: currentAdmin }) => {
+        setAdmin(currentAdmin);
+        return refreshStats();
+      })
+      .catch(() => {
+        setAdmin(null);
+        setStats(null);
+      })
+      .finally(() => setLoading(false));
   }, [refreshStats]);
 
   const login = async (email: string, password: string) => {
-    const data = await adminFetch<{ token: string; admin: Omit<Admin, "password_hash"> }>(
+    const data = await adminFetch<{ admin: Omit<Admin, "password_hash"> }>(
       "/auth/login",
       { method: "POST", body: JSON.stringify({ email, password }) }
     );
-    localStorage.setItem(TOKEN_KEY, data.token);
     setAdmin(data.admin);
     await refreshStats();
   };
 
-  const logout = () => {
-    localStorage.removeItem(TOKEN_KEY);
-    setAdmin(null);
-    setStats(null);
+  const logout = async () => {
+    try {
+      await adminFetch<{ success: boolean }>("/auth/logout", {
+        method: "POST",
+        body: JSON.stringify({}),
+      });
+    } finally {
+      setAdmin(null);
+      setStats(null);
+    }
   };
 
   return (

@@ -32,12 +32,12 @@ export default function CustomerSignupPage() {
   return (
     <AuthShell
       eyebrow="Create your account"
-      title="Make the next booking simpler."
-      description="Save your details once, keep track of appointments and return to studios you enjoyed."
-      panelEyebrow="Your personal booking desk"
-      panelTitle="Less searching through messages. More time for the visit."
-      panelDescription="A SalonBook account keeps the useful details together before, during and after every appointment."
-      highlights={["See upcoming and past bookings", "Cancel eligible appointments", "Rate completed visits"]}
+      title="Customer accounts are in limited pilot."
+      description="Account creation is available for controlled testing, but public guest bookings are not connected to an account yet. Keep your booking reference and contact the studio for changes."
+      panelEyebrow="Identity done carefully"
+      panelTitle="A matching name or phone number is not proof of ownership."
+      panelDescription="SalonBook will add verified-phone linking before allowing anyone to claim an earlier guest booking."
+      highlights={["Guest bookings remain protected", "No automatic name-and-phone matching", "Verified linking planned before public launch"]}
       footer={
         <>
           <p>Already have an account? <Link href="/customer/auth/login" className="font-bold text-primary-700 hover:underline">Sign in</Link></p>
@@ -52,6 +52,7 @@ export default function CustomerSignupPage() {
         <Input label="Password" type="password" autoComplete="new-password" placeholder="At least 8 characters" value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} required minLength={8} />
         <Input label="Phone number" type="tel" inputMode="tel" autoComplete="tel" placeholder="07XXXXXXXX" value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} required />
         <Button type="submit" loading={loading} className="w-full">Create customer account</Button>
+        <p className="text-xs leading-5 text-dark-500">By creating an account, you agree to the <Link href="/terms" className="font-semibold text-primary-700 hover:underline">Terms</Link> and acknowledge the <Link href="/privacy" className="font-semibold text-primary-700 hover:underline">Privacy Notice</Link>.</p>
       </form>
     </AuthShell>
   );

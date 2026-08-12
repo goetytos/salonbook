@@ -206,6 +206,7 @@ export interface SignupRequest {
   password: string;
   phone: string;
   location: string;
+  invitation_token: string;
 }
 
 export interface LoginRequest {
@@ -306,6 +307,8 @@ export interface BusinessPublicProfile {
   staff: Staff[];
   avg_rating: number;
   review_count: number;
+  status?: string;
+  preview_mode?: boolean;
 }
 
 // ─── API Error ────────────────────────────────────────

@@ -1,7 +1,12 @@
 import { NextRequest } from "next/server";
 import { requireAuth } from "@/lib/auth";
 import { updateBusinessProfile } from "@/lib/services/business.service";
-import { errorResponse, normalizeHttpsUrl, sanitize } from "@/lib/validation";
+import {
+  errorResponse,
+  normalizeHttpsUrl,
+  normalizeKenyanPhone,
+  sanitize,
+} from "@/lib/validation";
 
 const CATEGORIES = new Set([
   "hair-salon",
@@ -32,6 +37,37 @@ export async function PUT(
     }
     const input = body as Record<string, unknown>;
     const updates: Parameters<typeof updateBusinessProfile>[1] = {};
+
+    if (input.name !== undefined) {
+      if (typeof input.name !== "string") {
+        return errorResponse("Business name must be text");
+      }
+      const name = sanitize(input.name);
+      if (name.length < 2 || name.length > 120) {
+        return errorResponse("Business name must be between 2 and 120 characters");
+      }
+      updates.name = name;
+    }
+    if (input.phone !== undefined) {
+      if (typeof input.phone !== "string") {
+        return errorResponse("Phone number must be text");
+      }
+      const phone = normalizeKenyanPhone(input.phone);
+      if (!phone) {
+        return errorResponse("Invalid phone number. Use 07XXXXXXXX or +254XXXXXXXXX");
+      }
+      updates.phone = phone;
+    }
+    if (input.location !== undefined) {
+      if (typeof input.location !== "string") {
+        return errorResponse("Location must be text");
+      }
+      const location = sanitize(input.location);
+      if (location.length < 2 || location.length > 200) {
+        return errorResponse("Location must be between 2 and 200 characters");
+      }
+      updates.location = location;
+    }
 
     if (input.description !== undefined) {
       if (typeof input.description !== "string") {
@@ -95,6 +131,12 @@ export async function PUT(
     if (input.deposit_required !== undefined) {
       if (typeof input.deposit_required !== "boolean") {
         return errorResponse("deposit_required must be boolean");
+      }
+      if (input.deposit_required) {
+        return errorResponse(
+          "Deposits are not available until a verified payment provider is connected",
+          409
+        );
       }
       updates.deposit_required = input.deposit_required;
     }

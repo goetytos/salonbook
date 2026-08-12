@@ -11,8 +11,22 @@ import {
   sanitize,
   errorResponse,
 } from "@/lib/validation";
+import {
+  CUSTOMER_SIGNUP_RATE_LIMIT,
+  RateLimitUnavailableError,
+  enforceRateLimit,
+  rateLimitExceededResponse,
+  rateLimitUnavailableResponse,
+} from "@/lib/security/rate-limit";
+import {
+  authenticatedJsonResponse,
+  authenticationMutationGuard,
+} from "@/lib/auth-session";
 
 export async function POST(request: NextRequest) {
+  const rejected = authenticationMutationGuard(request);
+  if (rejected) return rejected;
+
   try {
     const body: unknown = await request.json();
     if (!body || typeof body !== "object" || Array.isArray(body)) {
@@ -45,9 +59,19 @@ export async function POST(request: NextRequest) {
     const passwordError = validatePassword(password);
     if (passwordError) return errorResponse(passwordError);
 
+    const rateLimit = await enforceRateLimit(request, CUSTOMER_SIGNUP_RATE_LIMIT, [
+      { kind: "email", value: cleanEmail },
+      { kind: "phone", value: cleanPhone },
+    ]);
+    if (!rateLimit.allowed) return rateLimitExceededResponse(rateLimit);
+
     const result = await registerCustomer(cleanName, cleanEmail, password, cleanPhone);
-    return Response.json(result, { status: 201 });
+    const { token, ...safeResult } = result;
+    return authenticatedJsonResponse(safeResult, "customer", token, 201);
   } catch (error) {
+    if (error instanceof RateLimitUnavailableError) {
+      return rateLimitUnavailableResponse();
+    }
     if (error instanceof SyntaxError) return errorResponse("Invalid JSON body");
     if (error instanceof CustomerRegistrationError) {
       return errorResponse("Email already registered", 409);

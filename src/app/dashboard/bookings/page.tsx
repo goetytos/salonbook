@@ -21,10 +21,13 @@ export default function BookingsPage() {
   const [statusFilter, setStatusFilter] = useState("");
   const [view, setView] = useState("list");
   const [updating, setUpdating] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
-  const fetchBookings = useCallback(async () => {
+  const fetchBookings = useCallback(async (showLoading = true) => {
     if (!business) return;
-    setLoading(true);
+    if (showLoading) setLoading(true);
+    else setRefreshing(true);
     setError("");
     try {
       const params = new URLSearchParams();
@@ -33,16 +36,25 @@ export default function BookingsPage() {
       const query = params.toString();
       const data = await api.get<Booking[]>(`/businesses/${business.id}/bookings${query ? `?${query}` : ""}`);
       setBookings(data);
+      setLastUpdated(new Date());
     } catch (requestError) {
-      setBookings([]);
+      if (showLoading) setBookings([]);
       setError(requestError instanceof Error ? requestError.message : "Bookings could not be loaded.");
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
+      else setRefreshing(false);
     }
   }, [business, dateFilter, statusFilter]);
 
   useEffect(() => {
     void fetchBookings();
+  }, [fetchBookings]);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === "visible") void fetchBookings(false);
+    }, 30_000);
+    return () => window.clearInterval(interval);
   }, [fetchBookings]);
 
   const updateStatus = async (bookingId: string, status: BookingStatus) => {
@@ -87,7 +99,17 @@ export default function BookingsPage() {
 
   return (
     <div>
-      <PageHeader eyebrow="Schedule" title="Bookings" description="Review appointments, filter the list and keep every visit’s status current." />
+      <PageHeader
+        eyebrow="Schedule"
+        title="Bookings"
+        description="Review appointments, filter the list and keep every visit’s status current. This view checks for new bookings every 30 seconds."
+        actions={
+          <div className="flex items-center gap-3">
+            {lastUpdated && <span className="hidden text-xs text-dark-500 sm:inline">Updated {lastUpdated.toLocaleTimeString("en-KE", { hour: "2-digit", minute: "2-digit" })}</span>}
+            <Button variant="secondary" size="sm" loading={refreshing} onClick={() => void fetchBookings(false)}>Refresh now</Button>
+          </div>
+        }
+      />
 
       <div className="mb-6 overflow-hidden rounded-xl border border-dark-200 bg-surface px-2">
         <Tabs ariaLabel="Booking view" tabs={[{ id: "list", label: "Appointment list" }, { id: "calendar", label: "Weekly calendar" }]} activeTab={view} onChange={setView} />
@@ -117,12 +139,13 @@ export default function BookingsPage() {
 
           {loading ? (
             <DashboardState type="loading" title="Loading bookings" />
-          ) : error ? (
+          ) : error && bookings.length === 0 ? (
             <DashboardState type="error" title="Bookings unavailable" description={error} onRetry={fetchBookings} />
           ) : bookings.length === 0 ? (
             <DashboardState title="No bookings match these filters" description="Clear the filters or wait for a new customer appointment." />
           ) : (
             <>
+              {error && <div className="mb-4"><DashboardState type="error" title="Could not check for newer bookings" description={`${error} The last loaded schedule remains visible.`} onRetry={() => void fetchBookings(false)} /></div>}
               <div className="space-y-3 md:hidden">
                 {bookings.map((booking) => (
                   <article key={booking.id} className="rounded-2xl border border-dark-200 bg-surface p-4">

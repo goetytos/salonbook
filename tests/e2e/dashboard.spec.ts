@@ -35,10 +35,21 @@ test("business owner completes a booking and can keyboard-switch schedule views"
     request.path.startsWith(`/api/businesses/${TEST_IDS.business}/`)
   );
   expect(protectedRequests.length).toBeGreaterThan(0);
-  expect(
-    protectedRequests.every(
-      (request) => request.authorization === "Bearer e2e-business-token"
-    )
-  ).toBe(true);
+  expect(protectedRequests.every((request) => request.authorization === null)).toBe(
+    true
+  );
+  const browserStorage = await page.evaluate(() => ({
+    business: window.localStorage.getItem("salonbook_token"),
+    customer: window.localStorage.getItem("salonbook_customer_token"),
+    admin: window.localStorage.getItem("salonbook_admin_token"),
+  }));
+  expect(browserStorage).toEqual({ business: null, customer: null, admin: null });
+  const sessionCookie = (await page.context().cookies()).find(
+    (cookie) => cookie.name === "salonbook_business_session"
+  );
+  expect(sessionCookie).toMatchObject({
+    httpOnly: true,
+    sameSite: "Lax",
+  });
   expect(api.unexpectedRequests).toEqual([]);
 });

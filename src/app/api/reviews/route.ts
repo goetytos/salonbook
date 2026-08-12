@@ -30,7 +30,13 @@ export async function POST(request: NextRequest) {
     return Response.json(review, { status: 201 });
   } catch (error) {
     if (error instanceof Response) return error;
-    const message = error instanceof Error ? error.message : "Failed to create review";
-    return errorResponse(message, 400);
+    if (
+      error instanceof Error &&
+      (error.message === "Booking not found or not completed" ||
+        error.message === "Review already submitted for this booking")
+    ) {
+      return errorResponse(error.message, 400);
+    }
+    return errorResponse("Failed to create review", 500);
   }
 }

@@ -1,6 +1,10 @@
 import { query, queryOne, transaction } from "@/lib/db";
 import { reservePromotionUsage } from "@/lib/services/promotion.service";
 import {
+  enqueueBookingCancellationIntent,
+  enqueueBookingNotificationIntents,
+} from "@/lib/services/notification-outbox.service";
+import {
   getNairobiDateTime,
   isPastDateTimeInNairobi,
   normalizeKenyanPhone,
@@ -649,6 +653,10 @@ export async function createBooking(
       );
       const booking = bookingResult.rows[0];
       if (!booking) throw new Error("Booking insert returned no row");
+
+      // A booking is not committed unless both PII-minimized notification
+      // intents are durable in the same transaction.
+      await enqueueBookingNotificationIntents(client, booking.id);
       return booking;
     });
   } catch (error) {
@@ -722,12 +730,61 @@ export async function updateBookingStatus(
   businessId: string,
   status: string
 ): Promise<Booking | null> {
-  return queryOne<Booking>(
-    `UPDATE bookings SET status = $1, no_show = $4
-     WHERE id = $2 AND business_id = $3
-     RETURNING *`,
-    [status, bookingId, businessId, status === "No-Show"]
-  );
+  return transaction(async (client) => {
+    const currentResult = await client.query<Booking>(
+      `SELECT * FROM bookings
+       WHERE id = $1 AND business_id = $2
+       FOR UPDATE`,
+      [bookingId, businessId]
+    );
+    const current = currentResult.rows[0] ?? null;
+    if (!current) return null;
+
+    // Repeated writes of the current status are idempotent. Once a booking is
+    // terminal it cannot be reopened or changed to a different terminal state.
+    if (current.status === status) return current;
+    if (current.status !== "Booked" || status === "Booked") {
+      throw new BookingServiceError(
+        "A terminal booking status cannot be changed",
+        409
+      );
+    }
+
+    const bookingResult = await client.query<Booking>(
+      `UPDATE bookings SET status = $1, no_show = $4
+       WHERE id = $2 AND business_id = $3 AND status = 'Booked'
+       RETURNING *`,
+      [status, bookingId, businessId, status === "No-Show"]
+    );
+    const booking = bookingResult.rows[0];
+    if (!booking) {
+      throw new BookingServiceError(
+        "Booking status changed; refresh and try again",
+        409
+      );
+    }
+
+    await client.query(
+      `UPDATE notification_outbox
+       SET status = 'dead',
+           lease_token = NULL,
+           lease_expires_at = NULL,
+           last_error_code = 'booking_not_booked',
+           provider_message_id = NULL,
+           accepted_at = NULL,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE booking_id = $1
+         AND type IN ('booking_confirmation', 'booking_owner_alert')
+         AND status IN ('pending', 'processing')`,
+      [bookingId]
+    );
+
+    if (status === "Cancelled") {
+      await enqueueBookingCancellationIntent(client, bookingId);
+    }
+
+    return booking;
+  });
 }
 
 /** Get weekly bookings for calendar view */

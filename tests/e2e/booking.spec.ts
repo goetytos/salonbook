@@ -47,7 +47,7 @@ test("books with a stylist after the delayed staff response resolves", async ({
   await page.getByPlaceholder("e.g. Akinyi Wambui").fill("Njeri Kamau");
   await page.getByPlaceholder("07XXXXXXXX").fill("0712345678");
   await page
-    .getByPlaceholder("Allergies, preferences or other requests")
+    .getByPlaceholder("Style preferences or arrival details")
     .fill("Low-tension finish");
   await page.getByPlaceholder("Enter code").fill("amani10");
   await page.getByRole("button", { name: "Apply code" }).click();
@@ -57,6 +57,10 @@ test("books with a stylist after the delayed staff response resolves", async ({
   await expect(
     page.getByRole("heading", { name: "Your time is reserved." })
   ).toBeVisible();
+  await expect(
+    page.getByText(`Reference ${TEST_IDS.booking.slice(-8).toUpperCase()}`)
+  ).toBeVisible();
+  await expect(page.getByText("Online rescheduling is not available yet.")).toBeVisible();
   expect(api.staffRequests).toBe(1);
   expect(api.bookingSubmissions).toEqual([
     {

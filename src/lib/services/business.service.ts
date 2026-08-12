@@ -1,5 +1,10 @@
+import { randomBytes } from "node:crypto";
 import { query, queryOne } from "@/lib/db";
 import { hashPassword, verifyPassword, signToken } from "@/lib/auth";
+import {
+  normalizeBusinessInvitationEmail,
+  redeemBusinessInvitation,
+} from "@/lib/services/business-invitation.service";
 import {
   getNairobiDateTime,
   normalizeKenyanPhone,
@@ -13,43 +18,59 @@ export async function registerBusiness(
   email: string,
   password: string,
   phone: string,
-  location: string
+  location: string,
+  invitationToken: string
 ): Promise<AuthResponse> {
   const normalizedPhone = normalizeKenyanPhone(phone);
   if (!normalizedPhone) throw new Error("Invalid phone number");
-
-  // Check if email already exists
-  const existing = await queryOne<Business>(
-    "SELECT id FROM businesses WHERE email = $1",
-    [email]
-  );
-  if (existing) throw new Error("Email already registered");
-
-  // Generate unique slug
-  let slug = slugify(name);
-  const slugExists = await queryOne<Business>(
-    "SELECT id FROM businesses WHERE slug = $1",
-    [slug]
-  );
-  if (slugExists) {
-    slug = `${slug}-${Date.now().toString(36)}`;
-  }
-
+  const normalizedEmail = normalizeBusinessInvitationEmail(email);
   const passwordHash = await hashPassword(password);
 
-  const business = await queryOne<Business>(
-    `INSERT INTO businesses (name, slug, email, password_hash, phone, location, status)
-     VALUES ($1, $2, $3, $4, $5, $6, 'pending')
-     RETURNING *`,
-    [name, slug, email, passwordHash, normalizedPhone, location]
+  const redeemed = await redeemBusinessInvitation(
+    invitationToken,
+    normalizedEmail,
+    async (client) => {
+      const existing = await client.query<{ id: string }>(
+        "SELECT id FROM public.businesses WHERE lower(btrim(email)) = $1",
+        [normalizedEmail]
+      );
+      if (existing.rows[0]) throw new Error("Email already registered");
+
+      const slugBase = slugify(name) || "studio";
+      const slugExists = await client.query<{ id: string }>(
+        "SELECT id FROM public.businesses WHERE slug = $1",
+        [slugBase]
+      );
+      const slug = slugExists.rows[0]
+        ? `${slugBase}-${randomBytes(4).toString("hex")}`
+        : slugBase;
+
+      const inserted = await client.query<Business>(
+        `INSERT INTO public.businesses
+           (name, slug, email, password_hash, phone, location, status)
+         VALUES ($1, $2, $3, $4, $5, $6, 'pending')
+         RETURNING *`,
+        [name, slug, normalizedEmail, passwordHash, normalizedPhone, location]
+      );
+      const business = inserted.rows[0];
+      if (!business) throw new Error("Failed to create business");
+
+      // Create the cookie credential before commit. A signing/configuration
+      // failure therefore rolls back both the account and invitation use.
+      const token = signToken({
+        id: business.id,
+        role: "business",
+        businessId: business.id,
+      });
+      const { password_hash: _, ...safe } = business;
+      return {
+        businessId: business.id,
+        response: { token, role: "business" as const, business: safe },
+      };
+    }
   );
 
-  if (!business) throw new Error("Failed to create business");
-
-  const token = signToken({ id: business.id, email: business.email, role: "business", businessId: business.id });
-
-  const { password_hash: _, ...safe } = business;
-  return { token, role: "business", business: safe };
+  return redeemed.response;
 }
 
 /** Authenticate a business owner */
@@ -58,8 +79,8 @@ export async function loginBusiness(
   password: string
 ): Promise<AuthResponse> {
   const business = await queryOne<Business>(
-    "SELECT * FROM businesses WHERE email = $1",
-    [email]
+    "SELECT * FROM businesses WHERE lower(btrim(email)) = $1",
+    [normalizeBusinessInvitationEmail(email)]
   );
   if (!business) throw new Error("Invalid email or password");
 
@@ -70,7 +91,7 @@ export async function loginBusiness(
     throw new Error("Business account is suspended");
   }
 
-  const token = signToken({ id: business.id, email: business.email, role: "business", businessId: business.id });
+  const token = signToken({ id: business.id, role: "business", businessId: business.id });
 
   const { password_hash: _, ...safe } = business;
   return { token, role: "business", business: safe };
@@ -154,6 +175,9 @@ export async function getDashboardStats(
 export async function updateBusinessProfile(
   businessId: string,
   data: {
+    name?: string;
+    phone?: string;
+    location?: string;
     description?: string;
     category?: string;
     cover_image_url?: string;
@@ -166,18 +190,24 @@ export async function updateBusinessProfile(
 ): Promise<Omit<Business, "password_hash"> | null> {
   const business = await queryOne<Business>(
     `UPDATE businesses SET
-      description = CASE WHEN $2::text IS NULL THEN description ELSE NULLIF($2, '') END,
-      category = CASE WHEN $3::text IS NULL THEN category ELSE NULLIF($3, '') END,
-      cover_image_url = CASE WHEN $4::text IS NULL THEN cover_image_url ELSE NULLIF($4, '') END,
-      avatar_url = CASE WHEN $5::text IS NULL THEN avatar_url ELSE NULLIF($5, '') END,
-      buffer_minutes = COALESCE($6, buffer_minutes),
-      cancellation_hours = COALESCE($7, cancellation_hours),
-      social_links = COALESCE($8::jsonb, social_links),
-      deposit_required = COALESCE($9, deposit_required)
+      name = COALESCE($2, name),
+      phone = COALESCE($3, phone),
+      location = COALESCE($4, location),
+      description = CASE WHEN $5::text IS NULL THEN description ELSE NULLIF($5, '') END,
+      category = CASE WHEN $6::text IS NULL THEN category ELSE NULLIF($6, '') END,
+      cover_image_url = CASE WHEN $7::text IS NULL THEN cover_image_url ELSE NULLIF($7, '') END,
+      avatar_url = CASE WHEN $8::text IS NULL THEN avatar_url ELSE NULLIF($8, '') END,
+      buffer_minutes = COALESCE($9, buffer_minutes),
+      cancellation_hours = COALESCE($10, cancellation_hours),
+      social_links = COALESCE($11::jsonb, social_links),
+      deposit_required = COALESCE($12, deposit_required)
      WHERE id = $1
      RETURNING *`,
     [
       businessId,
+      data.name ?? null,
+      data.phone ?? null,
+      data.location ?? null,
       data.description ?? null,
       data.category ?? null,
       data.cover_image_url ?? null,
@@ -193,15 +223,19 @@ export async function updateBusinessProfile(
   return safe;
 }
 
-/** Get public business profile with services, staff, and review summary */
-export async function getPublicBusinessProfile(slug: string) {
+/** Get an active public profile, or a private owner preview when authorized. */
+export async function getPublicBusinessProfile(
+  slug: string,
+  previewBusinessId?: string
+) {
   const business = await queryOne<Omit<Business, "password_hash" | "email">>(
     `SELECT id, name, slug, phone, location, working_hours, created_at,
             description, cover_image_url, avatar_url, category, social_links,
             cancellation_hours, deposit_required, buffer_minutes, status
      FROM businesses
-     WHERE slug = $1 AND status = 'active'`,
-    [slug]
+     WHERE slug = $1
+       AND (status = 'active' OR id = $2::uuid)`,
+    [slug, previewBusinessId || null]
   );
   if (!business) return null;
 

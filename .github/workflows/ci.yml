@@ -31,6 +31,7 @@ jobs:
       DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/salonbook_test_ci
       TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/salonbook_test_ci
       JWT_SECRET: salonbook-ci-secret-that-is-safely-longer-than-thirty-two-bytes
+      RATE_LIMIT_HMAC_SECRET: salonbook-ci-rate-limit-key-that-is-longer-than-thirty-two-bytes
       NEXT_PUBLIC_SITE_URL: http://127.0.0.1:3000
 
     steps:

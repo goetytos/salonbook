@@ -15,8 +15,9 @@ interface AuthState {
     password: string;
     phone: string;
     location: string;
+    invitation_token: string;
   }) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   refresh: () => Promise<void>;
 }
 
@@ -37,25 +38,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       setBusiness(null);
       setStats(null);
-      localStorage.removeItem("salonbook_token");
     }
   }, []);
 
   useEffect(() => {
-    const token = localStorage.getItem("salonbook_token");
-    if (token) {
-      refresh().finally(() => setLoading(false));
-    } else {
-      setLoading(false);
-    }
+    // Old releases exposed bearer tokens to JavaScript. Remove any surviving
+    // copy and validate the HttpOnly session cookie with the server instead.
+    localStorage.removeItem("salonbook_token");
+    refresh().finally(() => setLoading(false));
   }, [refresh]);
 
   const login = async (email: string, password: string) => {
-    const data = await api.post<{ token: string; business: Omit<Business, "password_hash"> }>(
+    const data = await api.post<{ business: Omit<Business, "password_hash"> }>(
       "/auth/login",
       { email, password }
     );
-    localStorage.setItem("salonbook_token", data.token);
     setBusiness(data.business);
     await refresh();
   };
@@ -66,20 +63,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     password: string;
     phone: string;
     location: string;
+    invitation_token: string;
   }) => {
-    const data = await api.post<{ token: string; business: Omit<Business, "password_hash"> }>(
+    const data = await api.post<{ business: Omit<Business, "password_hash"> }>(
       "/auth/signup",
       formData
     );
-    localStorage.setItem("salonbook_token", data.token);
     setBusiness(data.business);
     await refresh();
   };
 
-  const logout = () => {
-    localStorage.removeItem("salonbook_token");
-    setBusiness(null);
-    setStats(null);
+  const logout = async () => {
+    try {
+      await api.post<{ success: boolean }>("/auth/logout", {});
+    } finally {
+      setBusiness(null);
+      setStats(null);
+    }
   };
 
   return (

@@ -1,12 +1,6 @@
 /**
- * WhatsApp Notification Module (Stub)
- *
- * Integration target: WhatsApp Business Cloud API (Meta)
- * This module is ready for activation once API credentials are configured.
- *
- * Required env vars:
- *   WHATSAPP_API_TOKEN
- *   WHATSAPP_PHONE_NUMBER_ID
+ * WhatsApp remains intentionally unavailable until approved Meta templates,
+ * credentials, consent handling, and delivery status callbacks exist.
  */
 
 export interface WhatsAppMessage {
@@ -15,19 +9,20 @@ export interface WhatsAppMessage {
   templateParams: string[];
 }
 
+export interface WhatsAppDisabledResult {
+  success: false;
+  status: "disabled";
+  errorCode: "integration_not_configured";
+}
+
 export async function sendWhatsAppMessage(
-  msg: WhatsAppMessage
-): Promise<{ success: boolean }> {
-  console.log(
-    `[WhatsApp Stub] Would send template "${msg.templateName}" to ${msg.to}`
-  );
-
-  // TODO: Implement WhatsApp Cloud API call
-  // POST https://graph.facebook.com/v17.0/{PHONE_NUMBER_ID}/messages
-  // Headers: Authorization: Bearer {WHATSAPP_API_TOKEN}
-  // Body: { messaging_product: "whatsapp", to, type: "template", template: { name, language, components } }
-
-  return { success: true };
+  _message: WhatsAppMessage
+): Promise<WhatsAppDisabledResult> {
+  return {
+    success: false,
+    status: "disabled",
+    errorCode: "integration_not_configured",
+  };
 }
 
 export function sendBookingConfirmation(
@@ -36,7 +31,7 @@ export function sendBookingConfirmation(
   serviceName: string,
   date: string,
   time: string
-): Promise<{ success: boolean }> {
+): Promise<WhatsAppDisabledResult> {
   return sendWhatsAppMessage({
     to: phone,
     templateName: "booking_confirmation",

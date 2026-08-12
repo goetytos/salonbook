@@ -120,7 +120,7 @@ export default function Sidebar() {
             </Link>
           </div>
         )}
-        <button type="button" onClick={logout} className="mt-2 flex min-h-11 w-full items-center gap-3 rounded-lg px-3 text-sm font-semibold text-primary-200 hover:bg-white/10 hover:text-white">
+        <button type="button" onClick={() => void logout()} className="mt-2 flex min-h-11 w-full items-center gap-3 rounded-lg px-3 text-sm font-semibold text-primary-200 hover:bg-white/10 hover:text-white">
           <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><path d="M10 17l5-5-5-5m5 5H3m12-8h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" /></svg>
           Sign out
         </button>

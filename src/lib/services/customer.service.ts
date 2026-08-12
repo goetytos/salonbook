@@ -1,6 +1,7 @@
-import { query, queryOne } from "@/lib/db";
+import { query, queryOne, transaction } from "@/lib/db";
 import { hashPassword, verifyPassword, signToken } from "@/lib/auth";
 import { normalizeKenyanPhone } from "@/lib/validation";
+import { enqueueBookingCancellationIntent } from "@/lib/services/notification-outbox.service";
 import type { Customer, AuthResponse, Booking } from "@/types";
 
 export class CustomerRegistrationError extends Error {
@@ -9,6 +10,16 @@ export class CustomerRegistrationError extends Error {
   constructor() {
     super("Email already registered");
     this.name = "CustomerRegistrationError";
+  }
+}
+
+export class CustomerBookingActionError extends Error {
+  readonly status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "CustomerBookingActionError";
+    this.status = status;
   }
 }
 
@@ -59,7 +70,7 @@ export async function registerCustomer(
 
   if (!customer) throw new Error("Failed to create account");
 
-  const token = signToken({ id: customer.id, email: customer.email!, role: "customer" });
+  const token = signToken({ id: customer.id, role: "customer" });
 
   const { password_hash: _, ...safe } = customer;
   return { token, role: "customer", customer: safe };
@@ -81,7 +92,7 @@ export async function loginCustomer(
   const valid = await verifyPassword(password, customer.password_hash);
   if (!valid) throw new Error("Invalid email or password");
 
-  const token = signToken({ id: customer.id, email: customer.email!, role: "customer" });
+  const token = signToken({ id: customer.id, role: "customer" });
 
   const { password_hash: _, ...safe } = customer;
   return { token, role: "customer", customer: safe };
@@ -122,10 +133,55 @@ export async function cancelCustomerBooking(
   bookingId: string,
   customerId: string
 ): Promise<Booking | null> {
-  return queryOne<Booking>(
-    `UPDATE bookings SET status = 'Cancelled'
-     WHERE id = $1 AND customer_id = $2 AND status = 'Booked'
-     RETURNING *`,
-    [bookingId, customerId]
-  );
+  return transaction(async (client) => {
+    const candidate = await client.query<Booking & { can_cancel: boolean; cancellation_hours: number }>(
+      `SELECT b.*,
+              COALESCE(biz.cancellation_hours, 24)::int AS cancellation_hours,
+              (
+                b.date + b.time
+                >= (CURRENT_TIMESTAMP AT TIME ZONE 'Africa/Nairobi')
+                   + COALESCE(biz.cancellation_hours, 24) * INTERVAL '1 hour'
+              ) AS can_cancel
+       FROM bookings b
+       JOIN businesses biz ON biz.id = b.business_id
+       WHERE b.id = $1 AND b.customer_id = $2
+       FOR UPDATE OF b`,
+      [bookingId, customerId]
+    );
+    const booking = candidate.rows[0];
+    if (!booking || booking.status !== "Booked") return null;
+    if (!booking.can_cancel) {
+      throw new CustomerBookingActionError(
+        `Online cancellation closes ${booking.cancellation_hours} hour${booking.cancellation_hours === 1 ? "" : "s"} before the appointment. Contact the studio directly for help.`,
+        409
+      );
+    }
+
+    const updated = await client.query<Booking>(
+      `UPDATE bookings SET status = 'Cancelled'
+       WHERE id = $1 AND customer_id = $2 AND status = 'Booked'
+       RETURNING *`,
+      [bookingId, customerId]
+    );
+    const cancelledBooking = updated.rows[0] || null;
+    if (!cancelledBooking) return null;
+
+    await client.query(
+      `UPDATE notification_outbox
+       SET status = 'dead',
+           lease_token = NULL,
+           lease_expires_at = NULL,
+           last_error_code = 'booking_not_booked',
+           provider_message_id = NULL,
+           accepted_at = NULL,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE booking_id = $1
+         AND type IN ('booking_confirmation', 'booking_owner_alert')
+         AND status IN ('pending', 'processing')`,
+      [bookingId]
+    );
+    await enqueueBookingCancellationIntent(client, bookingId);
+
+    return cancelledBooking;
+  });
 }

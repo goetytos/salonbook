@@ -1,6 +1,9 @@
 import { NextRequest } from "next/server";
 import { requireCustomerAuth } from "@/lib/auth";
-import { cancelCustomerBooking } from "@/lib/services/customer.service";
+import {
+  cancelCustomerBooking,
+  CustomerBookingActionError,
+} from "@/lib/services/customer.service";
 import { errorResponse, validateUuid } from "@/lib/validation";
 
 // PATCH /api/customer/bookings/[bookingId] — cancel a booking
@@ -19,6 +22,9 @@ export async function PATCH(
     return Response.json(booking);
   } catch (error) {
     if (error instanceof Response) return error;
+    if (error instanceof CustomerBookingActionError) {
+      return errorResponse(error.message, error.status);
+    }
     return errorResponse("Failed to cancel booking", 500);
   }
 }

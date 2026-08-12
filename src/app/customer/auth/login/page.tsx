@@ -32,12 +32,12 @@ export default function CustomerLoginPage() {
   return (
     <AuthShell
       eyebrow="Customer account"
-      title="Your appointments, all in one place."
-      description="Sign in to see upcoming visits, manage bookings and share feedback after your appointment."
+      title="Customer accounts are in limited pilot."
+      description="Sign in only if an appointment is already attached to this account. Public guest bookings remain separate until secure phone verification is available."
       panelEyebrow="Made for your next visit"
       panelTitle="Find the right studio. Keep every plan close."
-      panelDescription="SalonBook brings discovery, booking details and visit history together without getting between you and the experience."
-      highlights={["Return to upcoming appointments", "Discover studios across Nairobi", "Leave useful feedback after a visit"]}
+      panelDescription="Keep the booking reference supplied after checkout and contact the studio directly for a guest booking change."
+      highlights={["Guest identity stays separate", "No unsafe automatic claiming", "Verified linking is planned"]}
       footer={
         <>
           <p>First time here? <Link href="/customer/auth/signup" className="font-bold text-primary-700 hover:underline">Create a customer account</Link></p>

@@ -142,7 +142,8 @@ export default function CustomerDetailPage() {
               ))}
             </div>
             <div className="mt-4 border-t border-dark-200 pt-4">
-              <Textarea label="Add a note" value={newNote} onChange={(event) => setNewNote(event.target.value)} placeholder="Preferences, allergies or useful context" />
+              <Textarea label="Add a note" value={newNote} onChange={(event) => setNewNote(event.target.value)} placeholder="Preferred styles or visit context" />
+              <p className="mt-2 text-xs leading-5 text-dark-500">Do not record health, identification or payment information here.</p>
               <div className="mt-2 flex justify-end"><Button size="sm" onClick={handleAddNote} loading={savingNote} disabled={!newNote.trim()}>Add note</Button></div>
             </div>
           </CardContent>

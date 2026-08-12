@@ -9,6 +9,7 @@ import Badge from "@/components/ui/Badge";
 import BarChart from "@/components/ui/BarChart";
 import PageHeader from "@/components/dashboard/PageHeader";
 import DashboardState from "@/components/dashboard/DashboardState";
+import { getNairobiDateTime } from "@/lib/validation";
 import type { Booking, AnalyticsData } from "@/types";
 
 export default function DashboardOverview() {
@@ -20,7 +21,7 @@ export default function DashboardOverview() {
 
   useEffect(() => {
     if (!business) return;
-    const today = new Date().toISOString().split("T")[0];
+    const today = getNairobiDateTime().date;
     setLoading(true);
     setError("");
 

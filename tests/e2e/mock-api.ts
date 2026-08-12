@@ -341,7 +341,16 @@ export async function installMockApi(
 }
 
 export async function authenticateBusiness(page: Page): Promise<void> {
-  await page.addInitScript(() => {
-    window.localStorage.setItem("salonbook_token", "e2e-business-token");
-  });
+  const baseUrl = process.env.PLAYWRIGHT_BASE_URL ||
+    `http://127.0.0.1:${Number(process.env.PORT || 3107)}`;
+  await page.context().addCookies([
+    {
+      name: "salonbook_business_session",
+      value: "e2e-cookie-session",
+      url: baseUrl,
+      httpOnly: true,
+      secure: baseUrl.startsWith("https://"),
+      sameSite: "Lax",
+    },
+  ]);
 }

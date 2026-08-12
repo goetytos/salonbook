@@ -25,7 +25,13 @@ async function expectNoWcagViolations(page: Page, pageName: string) {
 test("landing page meets automated WCAG A/AA checks", async ({ page }) => {
   const api = await installMockApi(page);
 
-  await page.goto("/");
+  const response = await page.goto("/");
+  expect(response?.headers()["content-security-policy"]).toContain(
+    "default-src 'self'"
+  );
+  expect(response?.headers()["content-security-policy"]).toContain(
+    "frame-ancestors 'none'"
+  );
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   await expectNoWcagViolations(page, "landing page");
   expect(api.unexpectedRequests).toEqual([]);

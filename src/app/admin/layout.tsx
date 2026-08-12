@@ -37,8 +37,8 @@ function AdminShell({ children }: { children: React.ReactNode }) {
     );
   }
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     router.push("/admin/login");
   };
 
@@ -57,7 +57,7 @@ function AdminShell({ children }: { children: React.ReactNode }) {
             <span className="hidden max-w-56 truncate text-xs text-primary-200 sm:block">{admin.email}</span>
             <button
               type="button"
-              onClick={handleLogout}
+              onClick={() => void handleLogout()}
               className="inline-flex min-h-11 items-center rounded-lg border border-white/15 px-3 text-sm font-bold text-white transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
             >
               Sign out

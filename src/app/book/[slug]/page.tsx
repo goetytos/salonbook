@@ -12,7 +12,7 @@ import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Textarea from "@/components/ui/Textarea";
 import { getNairobiDateTime } from "@/lib/validation";
-import type { Service, Staff, TimeSlot } from "@/types";
+import type { Booking, Service, Staff, TimeSlot } from "@/types";
 
 type Step = "service" | "staff" | "datetime" | "details" | "confirmed";
 
@@ -61,6 +61,7 @@ export default function BookingPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [notFound, setNotFound] = useState(false);
+  const [confirmedBooking, setConfirmedBooking] = useState<Booking | null>(null);
 
   const loadBookingPage = useCallback(async () => {
     setLoading(true);
@@ -186,6 +187,8 @@ export default function BookingPage() {
         const data = await response.json();
         throw new Error(data.error || "Booking failed");
       }
+      const createdBooking = await response.json() as Booking;
+      setConfirmedBooking(createdBooking);
       setStep("confirmed");
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "The appointment could not be booked.");
@@ -289,6 +292,7 @@ export default function BookingPage() {
     setPromoDiscount(null);
     setPromoError("");
     setError("");
+    setConfirmedBooking(null);
   };
 
   return (
@@ -408,7 +412,8 @@ export default function BookingPage() {
                   <form className="mt-6 space-y-4" onSubmit={(event) => { event.preventDefault(); void handleSubmit(); }} aria-busy={submitting || undefined}>
                     <Input label="Your name" autoComplete="name" placeholder="e.g. Akinyi Wambui" value={customerName} onChange={(event) => setCustomerName(event.target.value)} required autoFocus />
                     <Input label="Phone number" type="tel" inputMode="tel" autoComplete="tel" placeholder="07XXXXXXXX" value={customerPhone} onChange={(event) => setCustomerPhone(event.target.value)} required />
-                    <Textarea label="Notes (optional)" placeholder="Allergies, preferences or other requests" value={notes} onChange={(event) => setNotes(event.target.value)} rows={3} />
+                    <Textarea label="Notes (optional)" placeholder="Style preferences or arrival details" value={notes} onChange={(event) => setNotes(event.target.value)} rows={3} />
+                    <p className="-mt-2 text-xs leading-5 text-dark-500">Please do not include health, identity-document or payment information.</p>
 
                     <div className="rounded-2xl border border-dark-200 bg-dark-50/55 p-4">
                       <div className="grid gap-2 sm:grid-cols-[1fr_auto] sm:items-end">
@@ -426,6 +431,7 @@ export default function BookingPage() {
                     </div>
 
                     <Button type="submit" loading={submitting} disabled={!customerName.trim() || !customerPhone.trim()} className="w-full" size="lg">Confirm appointment</Button>
+                    <p className="text-xs leading-5 text-dark-500">By confirming, you acknowledge the <Link href="/privacy" className="font-semibold text-primary-700 hover:underline">Privacy Notice</Link> and agree to the <Link href="/terms" className="font-semibold text-primary-700 hover:underline">Booking Terms</Link>.</p>
                   </form>
                 </section>
               )}
@@ -435,13 +441,14 @@ export default function BookingPage() {
                   <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-green-100 text-green-700" aria-hidden="true"><svg className="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg></span>
                   <p className="mt-5 text-[0.68rem] font-bold uppercase tracking-[0.16em] text-green-700">Appointment confirmed</p>
                   <h2 id="confirmation-title" className="mt-2 font-display text-3xl font-semibold tracking-[-0.04em] text-dark-900">Your time is reserved.</h2>
-                  <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-dark-500">Keep these details handy. The studio can help if anything changes.</p>
+                  <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-dark-500">The appointment is saved in the studio calendar. Keep this reference and contact the studio directly if anything changes.</p>
+                  {confirmedBooking && <p className="mx-auto mt-4 w-fit rounded-lg bg-dark-50 px-3 py-2 font-mono text-sm font-bold tracking-[0.08em] text-dark-800">Reference {confirmedBooking.id.slice(-8).toUpperCase()}</p>}
                   <div className="mx-auto mt-6 max-w-lg text-left"><BookingSummaryCard serviceName={selectedService.name} date={selectedDate} time={selectedTime} price={Number(selectedService.price)} staffName={selectedStaffMember?.name} discountedPrice={getDiscountedPrice()} /></div>
                   <div className="mt-7 flex flex-col items-center justify-center gap-2 sm:flex-row">
                     <Button onClick={resetBooking}>Book another appointment</Button>
                     <Link href={`/profile/${slug}`} className="inline-flex min-h-11 items-center rounded-lg px-4 text-sm font-bold text-primary-700 hover:bg-primary-50">Return to studio profile</Link>
                   </div>
-                  <p className="mt-5 text-sm text-dark-500"><Link href="/customer/auth/signup" className="font-bold text-primary-700 hover:underline">Create a customer account</Link> to keep your bookings together.</p>
+                  <p className="mt-5 text-sm text-dark-500">Need to cancel or change the time? Call <a href={`tel:${business.phone}`} className="font-bold text-primary-700 hover:underline">{business.phone}</a>. Online rescheduling is not available yet.</p>
                 </section>
               )}
             </div>
