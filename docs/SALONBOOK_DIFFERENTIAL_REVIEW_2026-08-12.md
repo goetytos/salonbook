@@ -1,6 +1,6 @@
 # SalonBook differential security review — 2026-08-12
 
-Review status: **final for the frozen local working-tree snapshot**
+Review status: **final for committed snapshot `d84e57b6983b0f5d59aa5648d470044c424cf3bd`**
 
 ## Executive Summary
 
@@ -32,19 +32,18 @@ acceptance.
 
 **Key metrics**
 
-- Review target: base `fd8804c20a6ce038e44ea91b8dae6671d207f5c5`
-  versus the current uncommitted working tree.
+- Review target: commit range `fd8804c20a6ce038e44ea91b8dae6671d207f5c5`
+  through `d84e57b6983b0f5d59aa5648d470044c424cf3bd`.
 - Files analyzed: 101/101 changed or new files (100% inventory); all auth,
   booking, database, limiter, invitation, notification, and provider paths were
   reviewed deeply, while UI, legal copy, market research, and low-risk test
   fixture changes received a surface scan.
-- Change size at the final snapshot: +8,803/-470 lines across 101 files
-  (58 tracked modifications and 43 untracked files; the review report itself is
-  excluded).
+- Change size at the final snapshot: +8,833/-470 lines across 101 files (the
+  review report itself is excluded).
 - High-blast-radius security boundaries: the business auth helper reaches 21 API
   route modules, customer auth reaches 4, admin auth reaches 5, and the shared
   limiter reaches 6 protected API routes.
-- Security regressions in the final snapshot: 0. Seven material defects observed
+- Security regressions in the final snapshot: 0. Eight material defects observed
   in intermediate review states were fixed and retested; see “Resolved during
   review.”
 - Known high-risk test gaps: no live Africa's Talking/handset/delivery-receipt
@@ -57,9 +56,9 @@ acceptance.
 
 ## What Changed
 
-**Commit range:** `fd8804c20a6ce038e44ea91b8dae6671d207f5c5` → working tree
+**Commit range:** `fd8804c20a6ce038e44ea91b8dae6671d207f5c5` → `d84e57b6983b0f5d59aa5648d470044c424cf3bd`
 
-**New commits in range:** 0; all reviewed changes are currently uncommitted
+**New commits in range:** 2 (`29aa214`, `d84e57b`)
 
 **Baseline date:** 2026-08-11
 
@@ -77,7 +76,7 @@ acceptance.
 | Unit tests | 16 | Medium: security invariant evidence |
 | Integration tests | 6 | High: PostgreSQL behavior and migration evidence |
 | End-to-end tests | 5 | Medium: browser behavior and security headers |
-| **Total** | **101** | **+8,803/-470 lines** |
+| **Total** | **101** | **+8,833/-470 lines** |
 
 The worktree changes the product boundary materially:
 
@@ -114,7 +113,7 @@ Medium and Low issue because each affects the production decision.
 - `src/lib/services/notification-outbox.service.ts:L56-L70`
 - `src/lib/modules/sms/index.ts:L103-L149`, `L249-L373`
 
-**Commit:** uncommitted working tree
+**Commit:** `29aa214`
 
 **Blast radius:** the public booking write, every active salon's available
 inventory, two creation notification intents per accepted booking, and the
@@ -174,7 +173,7 @@ control for demonstrations.
 - `src/lib/services/notification-outbox.service.ts:L468-L471`, `L493-L531`
 - `README.md:L149-L152`
 
-**Commit:** uncommitted working tree
+**Commit:** `29aa214`
 
 **Blast radius:** all three SMS types and both dispatch entry points (post-booking
 `after()` and the protected recurring worker)
@@ -221,7 +220,7 @@ submit the same SMS again. A worker crash after provider acceptance but before
 - `src/lib/services/booking.service.ts:L727-L787`
 - `src/lib/services/customer.service.ts:L131-L186`
 
-**Commit:** uncommitted working tree
+**Commit:** `29aa214`
 
 **Blast radius:** creation confirmation and owner-alert jobs during concurrent
 cancellation/status transition
@@ -262,7 +261,7 @@ ordinary database row locks across an unbounded provider call.
 - `docs/PILOT-READINESS.md:L43-L56`
 - `docs/PRIVACY-OPERATIONS.md:L163-L175`
 
-**Commit:** uncommitted working tree
+**Commit:** `29aa214`
 
 **Blast radius:** `rate_limit_windows` storage/privacy operations
 
@@ -301,6 +300,7 @@ decisions and regression-sensitive tests visible.
 | Medium | Stale creation alerts and repeated cancellation transitions could produce incorrect/repeated cancellation SMS. | Transactional status machine, intent invalidation, unique intent keys, claim filtering, and preflight checks now cover normal/recovery cases. L-01 records the remaining narrow network-I/O race. |
 | Medium | SMS response parsing could wait on or buffer an unbounded provider body. | The request and body read share a 1–10 second abort deadline and a 64 KiB streaming cap. |
 | Medium | Invitation capability fallback in a query string exposed tokens to HTTP/referrer surfaces. | Admin links are fragment-only, responses are no-store/no-referrer, signup ignores query tokens and removes the accepted fragment from history. |
+| Medium | The outbox candidate query used unqualified `FOR UPDATE SKIP LOCKED`, so PostgreSQL also locked/skipped joined parent booking rows and could under-fill otherwise claimable concurrent batches. | Commit `d84e57b` changes the claim to `FOR UPDATE OF outbox SKIP LOCKED` (`src/lib/services/notification-outbox.service.ts:L212-L265`). A unit assertion locks the SQL invariant (`tests/unit/notification-outbox.test.ts:L136-L140`), while a deterministic PostgreSQL regression holds the parent booking `FOR UPDATE` and proves both child intents remain claimable (`tests/integration/notification-outbox.test.ts:L328-L356`); it passed focused, 20 stress, and two full integration runs. |
 
 ## Test Coverage
 
@@ -308,15 +308,15 @@ decisions and regression-sensitive tests visible.
 
 | Check | Result | Notes |
 | --- | --- | --- |
-| PostgreSQL 17 migrations 001–008 + integration | ✅ 38/38 | Reported by the coordinating reviewer on a fresh local safety-checked database |
-| Immediate migration checksum rerun + integration | ✅ 38/38 | Confirms tracked checksums and idempotent rerun behavior |
+| PostgreSQL 17 migrations 001–008 + integration | ✅ 39/39 | Fresh local safety-checked database; includes qualified outbox-lock regression |
+| Immediate migration checksum rerun + integration | ✅ 39/39 | Second full pass confirms tracked checksums, rerun behavior, and the final outbox claim fix |
 | Unit suite | ✅ 143/143 | Full current unit suite |
 | Focused high-risk unit suite | ✅ 110/110 | Independently rerun across 15 auth/booking/limiter/invite/SMS/outbox files |
 | Lint | ✅ | Independently rerun with zero warnings |
 | Typecheck | ✅ | Independently rerun (`next typegen` + `tsc --noEmit`) |
-| Coverage command | ✅ | 36.57% statements, 34.13% branches, 44.32% functions, 38.05% lines; no configured threshold |
+| Coverage command | ✅ 143/143 | 36.49% statements (496/1,359), 34.13% branches (382/1,119), 43.97% functions (124/282), 38.05% lines (473/1,243); no configured threshold |
 | Production build | ✅ | 45 routes built |
-| Production-mode Firefox suite | ✅ 10/10 in 44.8s | Nine deterministic fixture tests plus one real-stack canary; includes CSP/header assertion |
+| Production-mode Firefox suite | ✅ 10/10 in 53.5s | Final post-fix run: nine deterministic fixture tests plus one real-stack canary; includes CSP/header assertion |
 | Real-stack Firefox booking canary | ✅ 1/1 (included above) | Actual Next UI → POST → local safety-checked PostgreSQL booking, exact snapshot, and two pending durable intents |
 | `git diff --check` | ✅ | No whitespace errors |
 | `npm audit --omit=dev --audit-level=high` | ✅ | 0 vulnerabilities |
@@ -330,9 +330,9 @@ decisions and regression-sensitive tests visible.
   atomic concurrency, HMAC-only identifiers, bounded cleanup, trusted-network
   behavior, and row-growth cap after network exhaustion.
 - Booking/outbox same-transaction commit and forced rollback, unique creation and
-  cancellation intents, concurrent `SKIP LOCKED` workers, lease expiry, stale
-  dead-lettering, cancellation invalidation, terminal state rules, and customer
-  cancellation ownership.
+  cancellation intents, concurrent `SKIP LOCKED` workers, outbox-only lock scope
+  under a locked parent booking, lease expiry, stale dead-lettering, cancellation
+  invalidation, terminal state rules, and customer cancellation ownership.
 - Invitation migration privacy/indexes, raw-token non-persistence/non-echo,
   email binding, expiry, concurrent one-use redemption, rollback, and
   supersession.
@@ -401,7 +401,9 @@ connection, query, and statement timeouts.
 | `c564f1e` | Admin panel | Added platform-admin activation and statistics surfaces |
 | `e0d941a` | Recovery/hardening | Added core booking integrity, tenant hardening, and migrations through 004 |
 | `c72e8f9` | Strict Supabase TLS | Added CA verification and rejected connection-string SSL downgrades |
-| `fd8804c` | Recovery rollout documentation | Review baseline and current committed HEAD |
+| `fd8804c` | Recovery rollout documentation | Review baseline |
+| `29aa214` | Controlled Kenya pilot readiness | Primary reviewed feature, security, migration, documentation, and test commit |
+| `d84e57b` | Outbox worker lock scoping | Qualified `SKIP LOCKED` to outbox rows and added unit/real-PostgreSQL regressions |
 
 `git log -S` traces the removed `salonbook_token` pattern and the original SMS
 stub to `fc3324f`. The current change removes browser token writes rather than
@@ -410,9 +412,9 @@ stubs with a disabled-by-default provider and a PII-minimized outbox. No code
 introduced by the prior recovery/security commits was removed without an equal
 or stronger replacement.
 
-All new application lines are uncommitted, so they have no meaningful per-line
-commit attribution yet. Findings above identify the working tree explicitly;
-the baseline commit table provides the relevant historical provenance.
+The primary application change is attributable to `29aa214`; the final
+outbox-only lock qualification and its unit/deterministic PostgreSQL regressions
+are attributable to `d84e57b`.
 
 ## Recommendations
 
@@ -462,7 +464,7 @@ No active Critical/High item blocks a controlled-demo merge.
 - [ ] Keep M-Pesa, WhatsApp, Stripe, deposits, and online rescheduling disabled
   until their separate ledger, callback-authentication, reconciliation, refund,
   consent, and legal gates are implemented and tested.
-- [ ] Raise aggregate automated coverage from 36.57% statements with a CI threshold while
+- [ ] Raise aggregate automated coverage from 36.49% statements with a CI threshold while
   maintaining real PostgreSQL and browser security scenarios.
 
 ## Analysis Methodology
@@ -473,7 +475,7 @@ No active Critical/High item blocks a controlled-demo merge.
 **Techniques applied**
 
 1. Built the baseline from repository history and recovery commits, then
-   inventoried tracked and untracked changes against `fd8804c`.
+   inventoried the exact committed range `fd8804c..d84e57b`.
 2. Classified auth, cookies/CSRF, authorization, public booking, migrations,
    tenant boundaries, rate limiting, notification queues, provider I/O, and
    secrets as High-risk regardless of diff size.
@@ -504,9 +506,10 @@ No active Critical/High item blocks a controlled-demo merge.
 - This is a differential review, not a complete penetration test or legal
   opinion. Pre-existing code was traced when it governed a changed boundary but
   was not exhaustively audited feature by feature.
-- The worktree was frozen for the final inventory and line-reference refresh.
-  These findings apply to that exact local snapshot; any subsequent edit needs
-  proportionate re-review and retesting.
+- The reviewed application/test snapshot was committed and frozen at `d84e57b`
+  for the final inventory and line-reference refresh. These findings apply to
+  that exact snapshot; any subsequent code edit needs proportionate re-review
+  and retesting.
 - No live provider response, WAF behavior, restore, paid cron cadence, or
   delivery receipt was asserted.
 
@@ -561,7 +564,8 @@ MEDIUM for deployment/provider outcomes.
 
 ### C. Final sign-off record
 
-1. [x] The working tree was frozen for final review.
+1. [x] The reviewed code/test snapshot was frozen at commit `d84e57b`; this
+   report is the sole remaining worktree change.
 2. [x] The real-stack canary and final full suite passed on that exact snapshot.
 3. [x] Change totals and finding line references were refreshed.
 4. [x] `git status` contained only the reviewed source, test, configuration,
